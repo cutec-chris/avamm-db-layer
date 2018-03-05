@@ -37,6 +37,7 @@ type
     property LimitSTMT : string read GetLimitSTMT;
 
     function SetProperties(aProp : string;Connection : TAbstractDBConnection = nil) : Boolean;virtual;
+    function CreateDBFromProperties(aProp : string;Connection : TAbstractDBConnection = nil) : Boolean;virtual;
     function TableExists(aTableName : string;aConnection : TComponent = nil;AllowLowercase: Boolean = False) : Boolean;virtual;
     function TriggerExists(aTriggerName : string;aConnection : TComponent = nil;AllowLowercase: Boolean = False) : Boolean;virtual;
 
@@ -115,6 +116,18 @@ begin
   if Connection=nil then
     Connection := MainConnection;
   Result := (Connection as IBaseDBConnection).DoSetProperties(aProp);
+  (Connection as IBaseDBConnection).DoConnect;
+  Result := Result and ((Connection as IBaseDBConnection).IsConnected) and (Connection as IBaseDBConnection).DoInitializeConnection;
+  Tables.Clear;
+  CheckedTables.Clear;
+end;
+
+function TAbstractDBModule.CreateDBFromProperties(aProp: string;
+  Connection: TAbstractDBConnection): Boolean;
+begin
+  if Connection=nil then
+    Connection := MainConnection;
+  Result := (Connection as IBaseDBConnection).DoCreateDBFromProperties(aProp);
   (Connection as IBaseDBConnection).DoConnect;
   Result := Result and ((Connection as IBaseDBConnection).IsConnected) and (Connection as IBaseDBConnection).DoInitializeConnection;
   Tables.Clear;

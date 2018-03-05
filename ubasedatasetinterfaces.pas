@@ -134,6 +134,7 @@ type
 
   IBaseDBConnection = Interface['{FA8047C2-585E-4951-90B2-B97B9CB4F0FB}']
     function DoSetProperties(aProp : string) : Boolean;
+    function DoCreateDBFromProperties(aProp : string) : Boolean;
     function DoInitializeConnection : Boolean;
     function DoExecuteDirect(aSQL : string) : Integer;
     function DoStartTransaction(ForceTransaction : Boolean = False): Boolean;
