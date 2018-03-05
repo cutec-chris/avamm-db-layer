@@ -130,16 +130,21 @@ type
     function IsChanged : Boolean;
   end;
 
-  { IBaseConnection }
+  { IBaseDBConnection }
 
-  IBaseConnection = Interface['{FA8047C2-585E-4951-90B2-B97B9CB4F0FB}']
-    function SetProperties(aProp : string) : Boolean;
-    function ExecuteDirect(aSQL : string) : Integer;
-    function StartTransaction(ForceTransaction : Boolean = False): Boolean;
-    function CommitTransaction: Boolean;
-    function RollbackTransaction: Boolean;
-    procedure Disconnect;
-    procedure Connect;
+  IBaseDBConnection = Interface['{FA8047C2-585E-4951-90B2-B97B9CB4F0FB}']
+    function DoSetProperties(aProp : string) : Boolean;
+    function DoInitializeConnection : Boolean;
+    function DoExecuteDirect(aSQL : string) : Integer;
+    function DoStartTransaction(ForceTransaction : Boolean = False): Boolean;
+    function DoCommitTransaction: Boolean;
+    function DoRollbackTransaction: Boolean;
+    procedure DoDisconnect;
+    procedure DoConnect;
+    function DoGetTableNames(aTables : TStrings) : Boolean;
+    function DoGetTriggerNames(aTriggers : TStrings) : Boolean;
+    function GetDatabaseName : string;
+    function IsConnected : Boolean;
   end;
 
   { TAbstractDBDataset }
