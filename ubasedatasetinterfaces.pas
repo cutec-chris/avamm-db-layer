@@ -145,6 +145,8 @@ type
     function DoGetTriggerNames(aTriggers : TStrings) : Boolean;
     function GetDatabaseName : string;
     function IsConnected : Boolean;
+    function GetLimitAfterSelect : Boolean;
+    function GetLimitSTMT : string;
   end;
 
   { TAbstractDBDataset }

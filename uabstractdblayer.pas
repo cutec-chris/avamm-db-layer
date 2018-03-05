@@ -18,6 +18,8 @@ type
     FTriggers: TStrings;
   protected
     function GetConnection: TAbstractDBConnection;virtual;abstract;
+    function GetLimitAfterSelect: Boolean;virtual;
+    function GetLimitSTMT: string;virtual;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -31,6 +33,8 @@ type
     property Triggers : TStrings read FTriggers;
     function DBExists : Boolean;
     function GetFullTableName(aTable: string): string;virtual;
+    property LimitAfterSelect : Boolean read GetLimitAfterSelect;
+    property LimitSTMT : string read GetLimitSTMT;
 
     function SetProperties(aProp : string;Connection : TAbstractDBConnection = nil) : Boolean;virtual;
     function TableExists(aTableName : string;aConnection : TComponent = nil;AllowLowercase: Boolean = False) : Boolean;virtual;
@@ -61,6 +65,16 @@ end;
 function TAbstractDBModule.GetFullTableName(aTable: string): string;
 begin
   Result := aTable;
+end;
+
+function TAbstractDBModule.GetLimitAfterSelect: Boolean;
+begin
+  Result := (MainConnection as IBaseDBConnection).GetLimitAfterSelect;
+end;
+
+function TAbstractDBModule.GetLimitSTMT: string;
+begin
+  Result := (MainConnection as IBaseDBConnection).GetLimitSTMT;
 end;
 
 constructor TAbstractDBModule.Create(AOwner: TComponent);
