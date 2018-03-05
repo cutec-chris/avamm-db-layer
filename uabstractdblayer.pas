@@ -6,6 +6,17 @@ uses
   Classes,db,uBaseDatasetInterfaces,sysutils;
 
 type
+
+  { TInternalDBDataSet }
+
+  TInternalDBDataSet = class
+  private
+    FDataSet: TDataSet;
+  public
+    destructor Destroy;override;
+    property DataSet : TDataSet read FDataSet write FDataSet;
+  end;
+
   TAbstractDBConnection = class(TComponent);//IBaseDBConnection
   TAbstractDBQuery = class(TDataSet);//IBaseDBFilter,IBaseManageDB,IBaseSubDatasets,IBaseModifiedDS
 
@@ -20,11 +31,16 @@ type
     function GetConnection: TAbstractDBConnection;virtual;abstract;
     function GetLimitAfterSelect: Boolean;virtual;
     function GetLimitSTMT: string;virtual;
+    function GetDataSetClass : TDatasetClass;virtual;abstract;
+    function GetConnectionClass : TComponentClass;virtual;abstract;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
 
     property MainConnection : TAbstractDBConnection read GetConnection;
+
+    function GetNewDataSet(aTable : TAbstractDBDataset;aConnection : TComponent = nil;MasterData : TDataSet = nil;aTables : string = '') : TDataSet;virtual;
+    function GetNewDataSet(aSQL : string;aConnection : TComponent = nil;MasterData : TDataSet = nil;aOrigtable : TAbstractDBDataset = nil) : TDataSet;virtual;
 
     property CheckedTables : TStrings read FCheckedTables;
     function ShouldCheckTable(aTableName : string;SetChecked : Boolean = False) : Boolean;
@@ -48,7 +64,8 @@ type
     function QuoteField(aField : string) : string;virtual;
     function QuoteValue(aValue : string) : string;virtual;
     function EscapeString(aValue : string) : string;virtual;
-    function GetDBType : string;virtual;abstract;
+    function GetDBType : string;virtual;
+    function GetDBLayerType : string;virtual;
     function FieldToSQL(aName : string;aType : TFieldType;aSize : Integer;aRequired : Boolean) : string;
     function GetColumns(aTableName : string) : TStrings;
   end;
@@ -57,6 +74,13 @@ var
   QueryClass : TDatasetClass;
   ConnectionClass : TComponentClass;
 implementation
+
+{ TInternalDBDataSet }
+
+destructor TInternalDBDataSet.Destroy;
+begin
+  FreeAndNil(FDataSet);
+end;
 
 { TAbstractDBModule }
 
@@ -92,6 +116,57 @@ destructor TAbstractDBModule.Destroy;
 begin
   inherited Destroy;
   FCheckedTables.Free;
+end;
+
+function TAbstractDBModule.GetNewDataSet(aTable: TAbstractDBDataset;
+  aConnection: TComponent; MasterData: TDataSet; aTables: string): TDataSet;
+begin
+  //if IgnoreOpenrequests then exit;
+  Result := GetDataSetClass.Create(Self);
+  if not Assigned(aConnection) then
+    aConnection := MainConnection;
+  with TAbstractDBQuery(Result) as IBaseManageDB do
+    begin
+      SetConnection(aConnection);
+      SetTableNames(aTables);
+      aTable.DefineFields(Result);
+      aTable.DefineDefaultFields(Result,Assigned(Masterdata));
+      SetOrigTable(aTable);
+      if Assigned(Masterdata) then
+        begin
+          if not Assigned((MasterData as IBaseManageDB).MasterSource) then
+            begin
+              (MasterData as IBaseManageDB).MasterSource := TDataSource.Create(Self);
+              (MasterData as IBaseManageDB).MasterSource.DataSet := MasterData;
+            end;
+          MasterSource := (MasterData as IBaseManageDB).MasterSource;
+          with Masterdata as IBaseSubDataSets do
+            RegisterSubDataSet(aTable);
+        end;
+    end;
+end;
+
+function TAbstractDBModule.GetNewDataSet(aSQL: string; aConnection: TComponent;
+  MasterData: TDataSet; aOrigtable: TAbstractDBDataset): TDataSet;
+begin
+  Result := GetDataSetClass.Create(Self);
+  if not Assigned(aConnection) then
+    aConnection := MainConnection;
+  with TAbstractDBQuery(Result) as IBaseManageDB,TAbstractDBQuery(Result) as IBaseDbFilter do
+    begin
+      SetOrigTable(aOrigtable);
+      SetConnection(aConnection);
+      FullSQL := aSQL;
+      if Assigned(Masterdata) then
+        begin
+          if not Assigned((MasterData as IBaseManageDB).MasterSource) then
+            begin
+              (MasterData as IBaseManageDB).MasterSource := TDataSource.Create(Self);
+              (MasterData as IBaseManageDB).MasterSource.DataSet := MasterData;
+            end;
+          MasterSource := (MasterData as IBaseManageDB).MasterSource;
+        end;
+    end;
 end;
 
 function TAbstractDBModule.ShouldCheckTable(aTableName: string;
@@ -241,6 +316,16 @@ begin
   Result := StringReplace(aValue,'''','',[rfReplaceAll]);
 end;
 
+function TAbstractDBModule.GetDBType: string;
+begin
+  Result := (MainConnection as IBaseDBConnection).DoGetDBLayerType;
+end;
+
+function TAbstractDBModule.GetDBLayerType: string;
+begin
+  Result := 'SQL';
+end;
+
 function TAbstractDBModule.FieldToSQL(aName: string; aType: TFieldType;
   aSize: Integer; aRequired: Boolean): string;
 begin
@@ -251,7 +336,7 @@ begin
   ftString:
     begin
       if (GetDBType = 'firebird')
-      or (GetDBType = 'postgresql')
+      or (GetDBType = 'postgres')
       then
         Result := Result+' VARCHAR('+IntToStr(aSize)+')'
       else
@@ -334,7 +419,7 @@ end;
 
 function TAbstractDBModule.GetColumns(aTableName: string): TStrings;
 begin
-  Result := (MainConnection as IBaseDBConnection).GetColumns(aTableName);
+  Result := (MainConnection as IBaseDBConnection).DoGetColumns(aTableName);
 end;
 
 

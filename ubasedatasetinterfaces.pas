@@ -87,9 +87,14 @@ type
     property FilterTables : string read GetFilterTables write SetFilterTables;
     property UsePermissions : Boolean read GetUsePermissions write SetUsePermisions;
   end;
+
+  { IBaseManageDB }
+
   IBaseManageDB = interface['{271BD4A2-2720-49DA-90A6-AA64FB2B9862}']
   function GetAsReadonly: Boolean;
     function GetConnection: TComponent;
+    function GetMasterdataSource: TDataSource;
+    procedure SetConnection(aConn : TComponent);
     function GetManagedFieldDefs: TFieldDefs;
     function GetManagedIndexDefs: TIndexDefs;
     function GetTableCaption: string;
@@ -98,12 +103,15 @@ type
     function GetUpStdFields: Boolean;
     function GetUseIntegrity: Boolean;
     procedure SetAsReadOnly(AValue: Boolean);
+    procedure SetMasterdataSource(AValue: TDataSource);
     procedure SetUpChangedBy(AValue: Boolean);
     procedure SetUpStdFields(AValue: Boolean);
     procedure SetTableCaption(const AValue: string);
     function CreateTable : Boolean;
     function AlterTable : Boolean;
     procedure SetTableName(const AValue: string);
+    procedure SetTableNames(const AValue: string);
+    procedure SetOrigTable(AValue: TComponent);
     procedure SetUseIntegrity(AValue: Boolean);
     property ManagedFieldDefs : TFieldDefs read GetManagedFieldDefs;
     property ManagedIndexDefs : TIndexDefs read GetManagedIndexDefs;
@@ -112,8 +120,9 @@ type
     property UseIntegrity : Boolean read GetUseIntegrity write SetUseIntegrity;
     property UpdateStdFields : Boolean read GetUpStdFields write SetUpStdFields;
     property UpdateChangedBy : Boolean read GetUpChangedBy write SetUpChangedBy;
-    property DBConnection : TComponent read GetConnection;
+    property DBConnection : TComponent read GetConnection write SetConnection;
     property AsReadOnly : Boolean read GetAsReadonly write SetAsReadOnly;
+    property MasterSource : TDataSource read GetMasterdataSource write SetMasterdataSource;
   end;
 
   { IBaseSubDataSets }
@@ -135,6 +144,7 @@ type
   IBaseDBConnection = Interface['{FA8047C2-585E-4951-90B2-B97B9CB4F0FB}']
     function DoSetProperties(aProp : string) : Boolean;
     function DoCreateDBFromProperties(aProp : string) : Boolean;
+    function DoGetDBLayerType : string;
     function DoInitializeConnection : Boolean;
     function DoExecuteDirect(aSQL : string) : Integer;
     function DoStartTransaction(ForceTransaction : Boolean = False): Boolean;
@@ -144,7 +154,8 @@ type
     procedure DoConnect;
     function DoGetTableNames(aTables : TStrings) : Boolean;
     function DoGetTriggerNames(aTriggers : TStrings) : Boolean;
-    function GetColumns(aTableName: string): TStrings;
+    function DoGetColumns(aTableName: string): TStrings;
+    function DoGetIndexes(aTableName: string): TStrings;
     function GetDatabaseName : string;
     function IsConnected : Boolean;
     function GetLimitAfterSelect : Boolean;
