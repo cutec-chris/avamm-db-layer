@@ -7,7 +7,7 @@ unit avammdblayer;
 interface
 
 uses
-  uBaseDatasetInterfaces, LazarusPackageIntf;
+  uBaseDatasetInterfaces, uabstractdblayer, LazarusPackageIntf;
 
 implementation
 

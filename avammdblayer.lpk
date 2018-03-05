@@ -11,11 +11,15 @@
         <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
     </CompilerOptions>
-    <Files Count="1">
+    <Files Count="2">
       <Item1>
         <Filename Value="ubasedatasetinterfaces.pas"/>
         <UnitName Value="uBaseDatasetInterfaces"/>
       </Item1>
+      <Item2>
+        <Filename Value="uabstractdblayer.pas"/>
+        <UnitName Value="avammdblayer"/>
+      </Item2>
     </Files>
     <RequiredPkgs Count="1">
       <Item1>

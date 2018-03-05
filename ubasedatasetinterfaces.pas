@@ -130,6 +130,18 @@ type
     function IsChanged : Boolean;
   end;
 
+  { IBaseConnection }
+
+  IBaseConnection = Interface['{FA8047C2-585E-4951-90B2-B97B9CB4F0FB}']
+    function SetProperties(aProp : string) : Boolean;
+    function ExecuteDirect(aSQL : string) : Integer;
+    function StartTransaction(ForceTransaction : Boolean = False): Boolean;
+    function CommitTransaction: Boolean;
+    function RollbackTransaction: Boolean;
+    procedure Disconnect;
+    procedure Connect;
+  end;
+
   { TAbstractDBDataset }
 
   TAbstractDBDataset = class(TComponent)
