@@ -48,6 +48,8 @@ type
     function QuoteValue(aValue : string) : string;virtual;
     function EscapeString(aValue : string) : string;virtual;
     function GetDBType : string;virtual;abstract;
+    function FieldToSQL(aName : string;aType : TFieldType;aSize : Integer;aRequired : Boolean) : string;
+    function GetColumns(aTableName : string) : TStrings;
   end;
 
 var
@@ -224,6 +226,102 @@ end;
 function TAbstractDBModule.EscapeString(aValue: string): string;
 begin
   Result := StringReplace(aValue,'''','',[rfReplaceAll]);
+end;
+
+function TAbstractDBModule.FieldToSQL(aName: string; aType: TFieldType;
+  aSize: Integer; aRequired: Boolean): string;
+begin
+  if aName <> '' then
+    Result := QuoteField(aName)
+  else Result:='';
+  case aType of
+  ftString:
+    begin
+      if (GetDBType = 'firebird')
+      or (GetDBType = 'postgresql')
+      then
+        Result := Result+' VARCHAR('+IntToStr(aSize)+')'
+      else
+        Result := Result+' NVARCHAR('+IntToStr(aSize)+')';
+    end;
+  ftSmallint,
+  ftInteger:Result := Result+' INTEGER';
+  ftLargeInt:
+    begin
+      Result := Result+' BIGINT';
+    end;
+  ftAutoInc:
+    begin
+      if (GetDBType = 'mssql') then
+        Result := Result+' INTEGER PRIMARY KEY IDENTITY'
+      else if (GetDBType = 'sqlite') then
+        Result := Result+' INTEGER PRIMARY KEY AUTOINCREMENT'
+      else Result := Result+' INTEGER PRIMARY KEY';
+    end;
+  ftFloat:
+    begin
+      if (GetDBType = 'firebird') then
+        Result := Result+' DOUBLE PRECISION'
+      else
+        Result := Result+' FLOAT';
+    end;
+  ftDate:
+    begin
+      if (GetDBType = 'mssql') then
+        Result := Result+' DATETIME'
+      else
+        Result := Result+' DATE';
+    end;
+  ftDateTime:
+    begin
+      if (GetDBType = 'mssql')
+      or (GetDBType = 'mysql')
+      or (GetDBType = 'sqlite')
+      then
+        Result := Result+' DATETIME'
+      else
+        Result := Result+' TIMESTAMP'
+    end;
+  ftTime:
+    begin
+      if (GetDBType = 'mssql') then
+        Result := Result+' DATETIME'
+      else
+        Result := Result+' TIME';
+    end;
+  ftBlob:
+    begin
+      if (GetDBType = 'mssql') then
+        Result := Result+' IMAGE'
+      else if (GetDBType = 'postgresql') then
+        Result := Result+' BYTEA'
+      else if (GetDBType = 'mysql') then
+        Result := Result+' LONGBLOB'
+      else
+        Result := Result+' BLOB';
+    end;
+  ftMemo:
+    begin;
+      if (GetDBType = 'firebird') then
+        Result := Result+' BLOB SUB_TYPE 1'
+      else if (GetDBType = 'mysql') then
+        Result := Result+' LONGTEXT'
+      else
+        Result := Result+' TEXT';
+    end;
+  end;
+  if aRequired then
+    Result := Result+' NOT NULL'
+  else
+    begin
+      if (GetDBType = 'mssql') then
+        Result := Result+' NULL'
+    end;
+end;
+
+function TAbstractDBModule.GetColumns(aTableName: string): TStrings;
+begin
+  Result := (MainConnection as IBaseDBConnection).GetColumns(aTableName);
 end;
 
 

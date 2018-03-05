@@ -143,6 +143,7 @@ type
     procedure DoConnect;
     function DoGetTableNames(aTables : TStrings) : Boolean;
     function DoGetTriggerNames(aTriggers : TStrings) : Boolean;
+    function GetColumns(aTableName: string): TStrings;
     function GetDatabaseName : string;
     function IsConnected : Boolean;
     function GetLimitAfterSelect : Boolean;
