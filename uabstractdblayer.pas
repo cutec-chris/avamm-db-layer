@@ -42,7 +42,11 @@ type
 
     function GetNewDataSet(aTable : TAbstractDBDataset;aConnection : TComponent = nil;MasterData : TDataSet = nil;aTables : string = '') : TDataSet;virtual;
     function GetNewDataSet(aSQL : string;aConnection : TComponent = nil;MasterData : TDataSet = nil;aOrigtable : TAbstractDBDataset = nil) : TDataSet;virtual;
-    function GetNewConnection : TComponent;virtual;
+    function GetNewConnection(Connected : Boolean = True) : TComponent;virtual;
+    function StartTransaction(aConnection : TComponent;ForceTransaction : Boolean = False): Boolean;virtual;
+    function CommitTransaction(aConnection : TComponent): Boolean;virtual;
+    function RollbackTransaction(aConnection : TComponent): Boolean;virtual;
+    function IsTransactionActive(aConnection : TComponent): Boolean;virtual;
 
     property CheckedTables : TStrings read FCheckedTables;
     function ShouldCheckTable(aTableName : string;SetChecked : Boolean = False) : Boolean;
@@ -171,13 +175,41 @@ begin
     end;
 end;
 
-function TAbstractDBModule.GetNewConnection: TComponent;
+function TAbstractDBModule.GetNewConnection(Connected: Boolean): TComponent;
 begin
   Result := GetConnectionClass.Create(Self);
   with Result as IBaseDBConnection do
     begin
-      DoSetProperties(FProperties);
+      if DoSetProperties(FProperties) and Connected then
+        begin
+          (Result as IBaseDBConnection).DoConnect;
+          if ((Result as IBaseDBConnection).IsConnected) then
+            (Result as IBaseDBConnection).DoInitializeConnection;
+        end;
     end;
+end;
+
+function TAbstractDBModule.StartTransaction(aConnection: TComponent;
+  ForceTransaction: Boolean): Boolean;
+begin
+  Result := (aConnection as IBaseDBConnection).DoStartTransaction(ForceTransaction);
+end;
+
+function TAbstractDBModule.CommitTransaction(aConnection: TComponent): Boolean;
+begin
+  Result := (aConnection as IBaseDBConnection).DoCommitTransaction;
+end;
+
+function TAbstractDBModule.RollbackTransaction(aConnection: TComponent
+  ): Boolean;
+begin
+  Result := (aConnection as IBaseDBConnection).DoRollbackTransaction;
+end;
+
+function TAbstractDBModule.IsTransactionActive(aConnection: TComponent
+  ): Boolean;
+begin
+  //Result := (aConnection as IBaseDBConnection).IsTransactionActive;
 end;
 
 function TAbstractDBModule.ShouldCheckTable(aTableName: string;
