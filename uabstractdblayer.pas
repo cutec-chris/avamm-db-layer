@@ -141,7 +141,7 @@ begin
               (MasterData as IBaseManageDB).MasterSource := TDataSource.Create(Self);
               (MasterData as IBaseManageDB).MasterSource.DataSet := MasterData;
             end;
-          MasterSource := (MasterData as IBaseManageDB).MasterSource;
+          DataSource := (MasterData as IBaseManageDB).MasterSource;
           with Masterdata as IBaseSubDataSets do
             RegisterSubDataSet(aTable);
         end;
@@ -166,7 +166,7 @@ begin
               (MasterData as IBaseManageDB).MasterSource := TDataSource.Create(Self);
               (MasterData as IBaseManageDB).MasterSource.DataSet := MasterData;
             end;
-          MasterSource := (MasterData as IBaseManageDB).MasterSource;
+          DataSource := (MasterData as IBaseManageDB).MasterSource;
         end;
     end;
 end;

@@ -93,6 +93,7 @@ type
   IBaseManageDB = interface['{271BD4A2-2720-49DA-90A6-AA64FB2B9862}']
   function GetAsReadonly: Boolean;
     function GetConnection: TComponent;
+    function GetDataSource: TDataSource;
     function GetMasterdataSource: TDataSource;
     procedure SetConnection(aConn : TComponent);
     function GetManagedFieldDefs: TFieldDefs;
@@ -103,6 +104,7 @@ type
     function GetUpStdFields: Boolean;
     function GetUseIntegrity: Boolean;
     procedure SetAsReadOnly(AValue: Boolean);
+    procedure SetDataSource(AValue: TDataSource);
     procedure SetMasterdataSource(AValue: TDataSource);
     procedure SetUpChangedBy(AValue: Boolean);
     procedure SetUpStdFields(AValue: Boolean);
@@ -123,6 +125,7 @@ type
     property DBConnection : TComponent read GetConnection write SetConnection;
     property AsReadOnly : Boolean read GetAsReadonly write SetAsReadOnly;
     property MasterSource : TDataSource read GetMasterdataSource write SetMasterdataSource;
+    property DataSource : TDataSource read GetDataSource write SetDataSource;
   end;
 
   { IBaseSubDataSets }
