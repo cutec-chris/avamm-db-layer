@@ -27,6 +27,7 @@ type
     FCheckedTables : TStrings;
     FTables: TStrings;
     FTriggers: TStrings;
+    FProperties: String;
   protected
     function GetConnection: TAbstractDBConnection;virtual;abstract;
     function GetLimitAfterSelect: Boolean;virtual;
@@ -41,6 +42,7 @@ type
 
     function GetNewDataSet(aTable : TAbstractDBDataset;aConnection : TComponent = nil;MasterData : TDataSet = nil;aTables : string = '') : TDataSet;virtual;
     function GetNewDataSet(aSQL : string;aConnection : TComponent = nil;MasterData : TDataSet = nil;aOrigtable : TAbstractDBDataset = nil) : TDataSet;virtual;
+    function GetNewConnection : TComponent;virtual;
 
     property CheckedTables : TStrings read FCheckedTables;
     function ShouldCheckTable(aTableName : string;SetChecked : Boolean = False) : Boolean;
@@ -169,6 +171,15 @@ begin
     end;
 end;
 
+function TAbstractDBModule.GetNewConnection: TComponent;
+begin
+  Result := GetConnectionClass.Create(Self);
+  with Result as IBaseDBConnection do
+    begin
+      DoSetProperties(FProperties);
+    end;
+end;
+
 function TAbstractDBModule.ShouldCheckTable(aTableName: string;
   SetChecked: Boolean): Boolean;
 begin
@@ -188,6 +199,7 @@ end;
 function TAbstractDBModule.SetProperties(aProp: string;
   Connection: TAbstractDBConnection): Boolean;
 begin
+  FProperties := aProp;
   if Connection=nil then
     Connection := MainConnection;
   Result := (Connection as IBaseDBConnection).DoSetProperties(aProp);
@@ -281,6 +293,8 @@ end;
 function TAbstractDBModule.ExecuteDirect(aSQL: string; aConnection: TComponent
   ): Integer;
 begin
+  if aConnection = nil then
+    aConnection := MainConnection;
   Result := (aConnection as IBaseDBConnection).DoExecuteDirect(aSQL);
 end;
 
