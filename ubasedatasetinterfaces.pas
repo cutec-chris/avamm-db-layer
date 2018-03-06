@@ -112,8 +112,6 @@ type
     procedure SetUpChangedBy(AValue: Boolean);
     procedure SetUpStdFields(AValue: Boolean);
     procedure SetTableCaption(const AValue: string);
-    function CreateTable : Boolean;
-    function AlterTable : Boolean;
     procedure SetTableName(const AValue: string);
     procedure SetTableNames(const AValue: string);
     procedure SetOrigTable(AValue: TComponent);
@@ -179,6 +177,7 @@ type
     FOnRemoved: TNotifyEvent;
     FUpdateFloatFields: Boolean;
     FDataSet: TDataSet;
+    DoCheck: Boolean;
     FParent: TAbstractDBDataset;
     FWasOpen : Boolean;
     FSecModified: Boolean;
@@ -220,7 +219,9 @@ type
     procedure EnableChanges;virtual;
     procedure Change;virtual;
     procedure UnChange;virtual;
-    function CreateTable : Boolean;virtual;abstract;
+    function CreateTable : Boolean;virtual;
+    function CheckTable : Boolean;
+    function AlterTable : Boolean;virtual;
     property Count : Integer read GetCount;
     property FullCount : Integer read GetFullCount;
     property Connection : TComponent read GetConnection;
@@ -339,7 +340,7 @@ begin
     FilterEx(aFilter,aLimit);
 end;
 
-constructor TAbstractDBDataset.Create(AOwner: TComponent);
+constructor TAbstractDBDataset.Create(aOwner: TComponent);
 begin
   inherited Create(AOwner);
   FUpdateFloatFields := false;
@@ -395,6 +396,217 @@ begin
   FChanged:=False;
   if Assigned(FOnChanged) then
     FOnChanged(Self);
+end;
+
+function TAbstractDBDataset.CreateTable: Boolean;
+var
+  aSQL: String;
+  i: Integer;
+  RestartTransaction: Boolean = False;
+  NewTableName: String;
+begin
+  Result := False;
+  with TAbstractDBModule(DataModule) do
+    begin
+      if ((DataSet as IBaseDbFilter).Fields = '') then
+        begin
+          if (DataSet as IBaseDbFilter).Fields = '' then
+            DoCheck := True;
+          Result := True;
+          NewTableName := GetFullTableName(GetTableName);
+          aSQL := 'CREATE TABLE '+NewTableName+' ('+lineending;
+          if (DataSet as IBaseManageDB).GetUpStdFields then
+            begin
+              if (DataSet as IBaseManageDB).ManagedFieldDefs.IndexOf('AUTO_ID') = -1 then
+                aSQL += TAbstractDBModule(Self.Owner).FieldToSQL('SQL_ID',ftLargeInt,0,True)+' PRIMARY KEY,'+lineending
+              else
+                begin
+                  aSQL += TAbstractDBModule(Self.Owner).FieldToSQL('AUTO_ID',ftLargeInt,0,True)+' PRIMARY KEY,'+lineending;
+                end;
+            end;
+          if Assigned((DataSet as IBaseManageDB).MasterSource) and ((DataSet as IBaseManageDB).ManagedFieldDefs.IndexOf('REF_ID')=-1) then
+            begin
+              aSQL += TAbstractDBModule(Self.Owner).FieldToSQL('REF_ID',ftLargeInt,0,True);
+              if FUseIntegrity
+              and (pos('.',NewTableName)=-1) //Wenn eigene Tabelle in externer Datenbank, keine Ref. Intigrität
+              and (pos('.',GetFullTableName(((DataSet as IBaseManageDB).MasterSource.DataSet as IBaseManageDB).GetTableName))=-1) then //Wenn übergeordnete Tabelle in externer Datenbank, keine Ref. Intigrität
+                begin
+                  with (DataSet as IBaseManageDB).MasterSource.DataSet as IBaseManageDB do
+                    begin
+                      if ManagedFieldDefs.IndexOf('AUTO_ID') = -1 then
+                        aSQL += ' REFERENCES '+QuoteField((MasterSource.DataSet as IBaseManageDB).GetTableName)+'('+QuoteField('SQL_ID')+') ON DELETE CASCADE'
+                      else
+                        aSQL += ' REFERENCES '+QuoteField((MasterSource.DataSet as IBaseManageDB).GetTableName)+'('+QuoteField('AUTO_ID')+') ON DELETE CASCADE';
+                    end;
+                  if (TAbstractDBModule(Self.Owner).GetDBType = 'sqlite') then
+                    aSQL += ' DEFERRABLE INITIALLY DEFERRED';
+                end;
+              aSQL+=','+lineending;
+            end;
+          for i := 0 to (DataSet as IBaseManageDB).ManagedFieldDefs.Count-1 do
+            if (DataSet as IBaseManageDB).ManagedFieldDefs[i].Name <> 'AUTO_ID' then
+              aSQL += TAbstractDBModule(Self.Owner).FieldToSQL((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name,(DataSet as IBaseManageDB).ManagedFieldDefs[i].DataType,(DataSet as IBaseManageDB).ManagedFieldDefs[i].Size,(DataSet as IBaseManageDB).ManagedFieldDefs[i].Required)+','+lineending;
+          if (DataSet as IBaseManageDB).GetUpStdFields then
+            aSQL += TAbstractDBModule(Self.Owner).FieldToSQL('TIMESTAMPD',ftDateTime,0,True)+');'
+          else
+            aSql := copy(aSQL,0,length(aSQL)-2)+');';
+          //with BaseApplication as IBaseApplication do
+          //  Debug(aSQL);
+          TAbstractDBModule(Self.Owner).ExecuteDirect(aSQL,Connection);
+          //TODO:reconnect to DB and reopen all tables that WAS open
+          //TZConnection(bConnection).Disconnect;
+          //TZConnection(bConnection).Connect;
+        end;
+    end;
+  Close;
+end;
+
+function TAbstractDBDataset.CheckTable: Boolean;
+var
+  i: Integer;
+  aIndexes: TStrings;
+begin
+  Result := False;
+  with TAbstractDBModule(DataModule) do
+    begin
+      if DoCheck or ((DataSet as IBaseDbFilter).Fields = '') then
+          begin
+            for i := 0 to (DataSet as IBaseManageDB).ManagedFieldDefs.Count-1 do
+              begin
+                if (DataSet.FieldDefs.IndexOf((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name) = -1) and ((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name <> 'AUTO_ID') then
+                  begin
+                    Result := True;
+                  end
+                else if DataSet.FieldDefs.IndexOf((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name)>-1 then
+                  begin
+                    if FieldByName((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name).Size<(DataSet as IBaseManageDB).ManagedFieldDefs[i].Size then
+                      Result := True;
+                  end;
+              end;
+            aIndexes := (Connection as IBaseDBConnection).DoGetIndexes((DataSet as IBaseManageDB).GetTableName);
+            if Assigned((DataSet as IBaseManageDB).ManagedIndexDefs) then
+              for i := 0 to (DataSet as IBaseManageDB).ManagedIndexDefs.Count-1 do                                           //Primary key
+                if (aIndexes.IndexOf(Uppercase((DataSet as IBaseManageDB).GetTableName+'_'+(DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Name))=-1) and ((DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Name <>'SQL_ID') then
+                  begin
+                    Result := True;
+                  end;
+            aIndexes.Free;
+          end;
+{      if not Result then
+        begin
+          TAbstractDBModule(Self.Owner).UpdateTableVersion(Self.FDefaultTableName);
+        end;}
+    end;
+end;
+
+function TAbstractDBDataset.AlterTable: Boolean;
+var
+  i: Integer;
+  aSQL: String;
+  tmpSize: Integer;
+  aChanged: Boolean = False;
+  aIndexes: TStrings;
+  tmp: String;
+  tmp1: String;
+begin
+  Result := True;
+  try
+    if (DataSet as IBaseDbFilter).Fields <> '' then exit;
+    with TAbstractDBModule(DataModule) do
+      begin
+        for i := 0 to (DataSet as IBaseManageDB).ManagedFieldDefs.Count-1 do
+          begin
+            if (DataSet.FieldDefs.IndexOf((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name) = -1) and ((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name <> 'AUTO_ID') then
+              begin
+                aSQL := 'ALTER TABLE '+GetFullTableName((DataSet as IBaseManageDB).GetTableName)+' ADD '+TAbstractDBModule(DataModule).FieldToSQL((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name,(DataSet as IBaseManageDB).ManagedFieldDefs[i].DataType,(DataSet as IBaseManageDB).ManagedFieldDefs[i].Size,False)+';';
+                try
+                  TAbstractDBModule(DataModule).ExecuteDirect(aSQL);
+                  aChanged := True;
+                  Result := True;
+                except
+                end;
+              end
+            else if (DataSet.FieldDefs.IndexOf((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name)>-1) then
+              begin
+                tmpSize := FieldByName((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name).DisplayWidth;
+                if (tmpSize<(DataSet as IBaseManageDB).ManagedFieldDefs[i].Size)
+                and (tmpSize<>255) //mssql workaround we have no field that has 255 chars size
+                then
+                  begin
+//                    with BaseApplication as IBaseApplication do
+//                      Debug((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name+': ist '+IntToStr(tmpSize)+' soll '+IntToStr((DataSet as IBaseManageDB).ManagedFieldDefs[i].Size));
+                    if (TAbstractDBModule(DataModule).GetDBType = 'postgres') then
+                      aSQL := 'ALTER TABLE '+GetFullTableName((DataSet as IBaseManageDB).GetTableName)+' ALTER COLUMN '+QuoteField((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name)+' TYPE '+TAbstractDBModule(DataModule).FieldToSQL('',(DataSet as IBaseManageDB).ManagedFieldDefs[i].DataType,(DataSet as IBaseManageDB).ManagedFieldDefs[i].Size,False)+';'
+                    else if (TAbstractDBModule(DataModule).GetDBType = 'sqlite') then
+                    else
+                      aSQL := 'ALTER TABLE '+GetFullTableName((DataSet as IBaseManageDB).GetTableName)+' ALTER COLUMN '+QuoteField((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name)+' '+TAbstractDBModule(DataModule).FieldToSQL('',(DataSet as IBaseManageDB).ManagedFieldDefs[i].DataType,(DataSet as IBaseManageDB).ManagedFieldDefs[i].Size,False)+';';
+//                    with BaseApplication as IBaseApplication do
+//                      Debug(aSQL);
+                    if aSQL<>'' then
+                      begin
+//                        with BaseApplication as IBaseApplication do
+//                          Debug(aSQL);
+                        try
+                          TAbstractDBModule(DataModule).ExecuteDirect(aSQL);
+                          aChanged := True;
+                          Result := True;
+                        except
+                        end;
+                      end;
+                  end;
+              end;
+          end;
+        aSQL := '';
+        if Assigned((DataSet as IBaseManageDB).ManagedIndexDefs) then
+          for i := 0 to (DataSet as IBaseManageDB).ManagedIndexDefs.Count-1 do                                           //Primary key
+            begin
+              try
+                aIndexes := (Connection as IBaseDBConnection).DoGetIndexes((DataSet as IBaseManageDB).GetTableName);
+                tmp := (DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Name;
+                tmp1 := aIndexes.Text;
+                if (aIndexes.IndexOf(tmp)=-1) and ((DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Name <>'SQL_ID') then
+                  begin
+                    aSQL := 'CREATE ';
+                    if ixUnique in (DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Options then
+                      aSQL := aSQL+'UNIQUE ';
+                    aSQL := aSQL+'INDEX '+QuoteField(Uppercase((DataSet as IBaseManageDB).GetTableName+'_'+(DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Name))+' ON '+GetFullTableName((DataSet as IBaseManageDB).GetTableName)+' ('+QuoteField(StringReplace((DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Fields,';',QuoteField(','),[rfReplaceAll]))+');'+lineending;
+                    if aSQL <> '' then
+                      begin
+//                        with BaseApplication as IBaseApplication do
+//                          Debug(aSQL);
+                        TAbstractDBModule(DataModule).ExecuteDirect(aSQL);
+                      end;
+                    Result := True;
+                  end;
+                aIndexes.Free;
+              except
+              end;
+            end;
+      end;
+  except
+    on e : Exception do
+      begin
+//        with BaseApplication as IBaseApplication do
+//          Error('Altering failed:'+e.Message);
+        Result := False;
+      end;
+  end;
+{
+  if Result and Changed and (Self.FDefaultTableName<>'TABLEVERSIONS') then
+    begin
+      with BaseApplication as IBaseApplication do
+        Info('Table '+Self.FDefaultTableName+' resetting Metadata Infos...');
+      try
+        Connection.DbcConnection.GetMetadata.ClearCache;
+      except
+      end;
+    end;
+  if Changed then
+    begin
+      TBaseDBModule(Self.Owner).UpdateTableVersion(Self.FDefaultTableName);
+      Self.Unprepare;
+    end;
+}
 end;
 
 function TAbstractDBDataset.Delete: Boolean;
