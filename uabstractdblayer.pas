@@ -57,6 +57,7 @@ type
     function GetFullTableName(aTable: string): string;virtual;
     property LimitAfterSelect : Boolean read GetLimitAfterSelect;
     property LimitSTMT : string read GetLimitSTMT;
+    function IsSQLDB : Boolean;virtual;
 
     function SetProperties(aProp : string;Connection : TAbstractDBConnection = nil) : Boolean;virtual;
     function CreateDBFromProperties(aProp : string;Connection : TAbstractDBConnection = nil) : Boolean;virtual;
@@ -74,11 +75,15 @@ type
     function GetDBLayerType : string;virtual;
     function FieldToSQL(aName : string;aType : TFieldType;aSize : Integer;aRequired : Boolean) : string;
     function GetColumns(aTableName : string) : TStrings;
+    function DecodeFilter(aSQL : string;Parameters : TStringList;var NewSQL : string) : Boolean;virtual;
+    function CheckForInjection(aFilter : string) : Boolean;
   end;
 
 var
   QueryClass : TDatasetClass;
   ConnectionClass : TComponentClass;
+resourcestring
+  strSQLInjection                = 'Versuchte SQL Injection !';
 implementation
 
 { TInternalDBDataSet }
@@ -98,6 +103,11 @@ end;
 function TAbstractDBModule.GetFullTableName(aTable: string): string;
 begin
   Result := aTable;
+end;
+
+function TAbstractDBModule.IsSQLDB: Boolean;
+begin
+  Result := GetDBLayerType='SQL';
 end;
 
 function TAbstractDBModule.GetLimitAfterSelect: Boolean;
@@ -466,6 +476,58 @@ end;
 function TAbstractDBModule.GetColumns(aTableName: string): TStrings;
 begin
   Result := (MainConnection as IBaseDBConnection).DoGetColumns(aTableName);
+end;
+
+function TAbstractDBModule.DecodeFilter(aSQL: string; Parameters: TStringList;
+  var NewSQL: string): Boolean;
+var
+  aQuotes: String;
+  i: Integer;
+  aParamCont: String;
+begin
+  aQuotes := QuoteValue('');
+  aQuotes := copy(aQuotes,0,1);
+  i := 0;
+  NewSQL := '';
+  Parameters.Clear;
+  while pos(aQuotes,aSQL)>0 do
+    begin
+      NewSQL:=NewSQL+copy(aSQL,0,pos(aQuotes,aSQL)-1);
+      aSQL := copy(aSQL,pos(aQuotes,aSQL)+1,length(aSQL));
+      NewSQL:=NewSQL+':Param'+IntToStr(i);
+      aParamCont := copy(aSQL,0,pos(aQuotes,aSQL)-1);
+      aSQL := copy(aSQL,pos(aQuotes,aSQL)+1,length(aSQL));
+      if copy(aSQL,0,1)=aQuotes then
+        begin
+          aParamCont += aQuotes+copy(aSQL,0,pos(aQuotes,aSQL)-1);
+          aSQL := copy(aSQL,pos(aQuotes,aSQL)+1,length(aSQL));
+          aParamCont += aQuotes+copy(aSQL,0,pos(aQuotes,aSQL)-1);
+          aSQL := copy(aSQL,pos(aQuotes,aSQL)+1,length(aSQL));
+        end;
+      Parameters.Values['Param'+IntToStr(i)]:=aParamCont;
+      NewSQL:=NewSQL;
+      inc(i);
+    end;
+  NewSQL:=NewSQL+aSQL;
+end;
+
+function TAbstractDBModule.CheckForInjection(aFilter: string): Boolean;
+begin
+  Result := False;
+  if (pos('insert into',lowercase(aFilter)) > 0)
+//  or (pos('update ',lowercase(aFilter)) > 0)
+  or (pos('delete table',lowercase(aFilter)) > 0)
+  or (pos('delete from',lowercase(aFilter)) > 0)
+  or (pos('alter table',lowercase(aFilter)) > 0)
+//  or (pos('union select ',lowercase(aFilter)) > 0)
+  or (pos('select if ',lowercase(aFilter)) > 0)
+  or (pos(' into outfile',lowercase(aFilter)) > 0)
+  or (pos(' into dumpfile',lowercase(aFilter)) > 0)
+  then
+    begin
+      raise Exception.Create(strSQLInjection);
+      Result := True;
+    end;
 end;
 
 

@@ -34,6 +34,7 @@ type
   IBaseDbFilter = interface['{7EBB7ABE-1171-4333-A609-C0F59B1E2C5F}']
     function GetBaseSortDirection: TSortDirection;
     function GetfetchRows: Integer;
+    function GetParameterValue(const Name: string): Variant;
     function GetUseBaseSorting: Boolean;
     procedure SetBaseSortDirection(AValue: TSortDirection);
     function GetBaseSorting: string;
@@ -44,6 +45,7 @@ type
     procedure SetfetchRows(AValue: Integer);
     procedure SetFields(const AValue: string);
     function GetSQL: string;
+    procedure SetParameterValue(const Name: string; AValue: Variant);
     procedure SetSQL(const AValue: string);
     function GetFilter: string;
     procedure SetFilter(const AValue: string);
@@ -86,6 +88,7 @@ type
     property SortLocal : Boolean read GetSortLocal write SetSortLocal;
     property FilterTables : string read GetFilterTables write SetFilterTables;
     property UsePermissions : Boolean read GetUsePermissions write SetUsePermisions;
+    property Parameter[const Name: string]: Variant read GetParameterValue write SetParameterValue;
   end;
 
   { IBaseManageDB }
@@ -175,17 +178,69 @@ type
     FOnChanged: TNotifyEvent;
     FOnRemoved: TNotifyEvent;
     FUpdateFloatFields: Boolean;
+    FDataSet: TDataSet;
+    FParent: TAbstractDBDataset;
+    FWasOpen : Boolean;
+    FSecModified: Boolean;
+    FUseIntegrity : Boolean;
+    function GetActive: Boolean;
+    function GetCanEdit: Boolean;
+    function GetCaption: string;
+    function GetConnection: TComponent;
+    function GetCount: Integer;
+    function GetFilter: string;
+    function GetFRows: Integer;
+    function GetFullCount: Integer;
+    function GetIsReadOnly: Boolean;
+    function GetLimit: Integer;
+    function GetSortDirection: TSortDirection;
+    function GetSortFields: string;
+    function GetState: TDataSetState;
+    function GetTableName: string;
+    procedure SetActive(AValue: Boolean);
+    procedure SetFilter(AValue: string);
+    procedure SetFRows(AValue: Integer);
+    procedure SetLimit(AValue: Integer);
+    procedure SetIsReadOnly(AValue: Boolean);
+    procedure SetSortDirection(AValue: TSortDirection);
+    procedure SetSortFields(AValue: string);
   public
-    constructor Create(AOwner: TComponent); override;
-    procedure DefineFields(aDataSet : TDataSet);virtual;abstract;
-    procedure DefineDefaultFields(aDataSet : TDataSet;HasMasterSource : Boolean);virtual;abstract;
-    procedure DefineUserFields(aDataSet: TDataSet);virtual;abstract;
+    constructor CreateExIntegrity(aOwner : TComponent;DM : TComponent;aUseIntegrity : Boolean;aConnection : TComponent = nil;aMasterdata : TDataSet = nil);virtual;
+    constructor CreateEx(aOwner : TComponent;DM : TComponent;aConnection : TComponent = nil;aMasterdata : TDataSet = nil);virtual;
+    constructor Create(aOwner : TComponent);override;
+    property DataSet : TDataSet read FDataSet write FDataSet;
+    procedure Open;virtual;
+    procedure Close;virtual;
+    procedure DefineFields(aDataSet : TDataSet);virtual;
+    procedure DefineDefaultFields(aDataSet : TDataSet;HasMasterSource : Boolean);virtual;
+    procedure DefineUserFields(aDataSet: TDataSet);virtual;
     procedure FillDefaults(aDataSet : TDataSet);virtual;
     procedure SetDisplayLabels(aDataSet : TDataSet);virtual;
     procedure DisableChanges;virtual;
     procedure EnableChanges;virtual;
     procedure Change;virtual;
     procedure UnChange;virtual;
+    function CreateTable : Boolean;virtual;abstract;
+    property Count : Integer read GetCount;
+    property FullCount : Integer read GetFullCount;
+    property Connection : TComponent read GetConnection;
+    property State : TDataSetState read GetState;
+    property TableName : string read GetTableName;
+    procedure CascadicPost;virtual;
+    procedure CascadicCancel;virtual;
+    function Delete : Boolean;virtual;
+    procedure Insert;virtual;
+    procedure Append;virtual;
+    procedure First;virtual;
+    procedure Last;virtual;
+    procedure Next;virtual;
+    procedure Prior;virtual;
+    procedure Post;virtual;
+    procedure Edit;virtual;
+    procedure Cancel;virtual;
+    function Locate(const keyfields: string; const keyvalues: Variant; options: TLocateOptions) : boolean; virtual;
+    function EOF : Boolean;virtual;
+    function FieldByName(const aFieldName : string) : TField;virtual;
 
     function CheckForInjection(aQuery : string) : Boolean;virtual;
     procedure DoBeforeDelete;virtual;
@@ -195,20 +250,93 @@ type
     property OnChange : TNotifyEvent read FOnChanged write FOnChanged;
     property OnRemove : TNotifyEvent read FOnRemoved write FOnRemoved;
     property Changed : Boolean read FChanged;
+    procedure Filter(aFilter : string;aLimit : Integer = 0);virtual;
+    procedure FilterEx(aFilter : string;aLimit : Integer = 0;aOrderBy : string = '';aSortDirection : string = 'ASC';aLocalSorting : Boolean = False;aGlobalFilter : Boolean = True;aUsePermissions : Boolean = False;aFilterIn : string = '');virtual;
+    property ActualFilter : string read GetFilter write SetFilter;
+    property ActualLimit : Integer read GetLimit write SetLimit;
+    property SortFields : string read GetSortFields write SetSortFields;
+    property SortDirection : TSortDirection read GetSortDirection write SetSortDirection;
+    property FetchRows : Integer read GetFRows write SetFRows;
+    property Parent : TAbstractDBDataset read FParent;
+    property CanEdit : Boolean read GetCanEdit;
+    property IsReadOnly : Boolean read GetIsReadOnly write SetIsReadOnly;
+    property Active : Boolean read GetActive write SetActive;
+    property Caption : string read GetCaption;
   end;
 
 implementation
 
+uses uAbstractDBLayer;
+
 { TAbstractDBDataset }
+
+constructor TAbstractDBDataset.CreateExIntegrity(aOwner: TComponent; DM: TComponent;
+  aUseIntegrity: Boolean; aConnection: TComponent; aMasterdata: TDataSet);
+begin
+  inherited Create(aOwner);
+  FWasOpen:=False;
+  Fparent := nil;
+  DataModule := DM;
+  if DataModule=nil then
+//    DataModule:=Data;
+    raise Exception.Create('No Datamodule Assigned !');
+  FSecModified := True;
+  FUseIntegrity:=aUseIntegrity;
+  FOnChanged := nil;
+  if Assigned(aOwner) and (aOwner is TAbstractDBDataset) then
+    FParent := TAbstractDBDataset(aOwner);
+  //with BaseApplication as IBaseDbInterface do
+    begin
+      with DataModule as TAbstractDBModule do
+        FDataSet := GetNewDataSet(Self,aConnection,aMasterdata);
+      with FDataSet as IBaseManageDB do
+        UseIntegrity := FUseIntegrity;
+      with FDataSet as IBaseDBFilter do
+        begin
+          Limit := 100;
+          FetchRows:=20;
+        end;
+    end;
+end;
+constructor TAbstractDBDataset.CreateEx(aOwner: TComponent; DM: TComponent;
+  aConnection: TComponent; aMasterdata: TDataSet);
+begin
+  CreateExIntegrity(aOwner,DM,True,aConnection,aMasterdata);
+end;
 
 procedure TAbstractDBDataset.DoBeforeDelete;
 begin
   if Assigned(Self) and Assigned(Self.OnRemove) then Self.OnRemove(Self);
 end;
-
 procedure TAbstractDBDataset.DoAfterDelete;
 begin
+end;
 
+procedure TAbstractDBDataset.FilterEx(aFilter: string; aLimit: Integer;
+  aOrderBy: string; aSortDirection: string; aLocalSorting: Boolean;
+  aGlobalFilter: Boolean; aUsePermissions: Boolean; aFilterIn: string);
+begin
+  with DataSet as IBaseDbFilter do
+    begin
+      UsePermissions := aUsePermissions;
+      if (aOrderBy <> '') then
+        begin
+          SortFields:=aOrderBy;
+          if aSortDirection = 'DESC' then
+            SortDirection := sdDescending
+          else
+            SortDirection := sdAscending;
+        end;
+      Limit := aLimit;
+      Filter := aFilter;
+    end;
+  Open;
+end;
+
+procedure TAbstractDBDataset.Filter(aFilter: string; aLimit: Integer);
+begin
+  if (not ((ActualFilter=aFilter) and (aLimit=ActualLimit))) or (not DataSet.Active) then
+    FilterEx(aFilter,aLimit);
 end;
 
 constructor TAbstractDBDataset.Create(AOwner: TComponent);
@@ -235,7 +363,22 @@ begin
   if FDoChange > 0 then
     dec(FDoChange);
 end;
-
+procedure TAbstractDBDataset.CascadicPost;
+begin
+  if CanEdit then
+    Post;
+  UnChange;
+  if Assigned(FOnChanged) then
+    FOnChanged(Self);
+end;
+procedure TAbstractDBDataset.CascadicCancel;
+begin
+  if (FDataSet.State = dsEdit) or (FDataSet.State = dsInsert) then
+    FDataSet.Cancel;
+  UnChange;
+  if Assigned(FOnChanged) then
+    FOnChanged(Self);
+end;
 procedure TAbstractDBDataset.Change;
 begin
   if FDoChange > 0 then exit;
@@ -254,9 +397,310 @@ begin
     FOnChanged(Self);
 end;
 
+function TAbstractDBDataset.Delete: Boolean;
+begin
+  Result := False;
+  if FDataSet.Active and (Count > 0) then
+    begin
+      Change;
+      FDataSet.Delete;
+      Result := True;
+    end;
+end;
+
+procedure TAbstractDBDataset.Insert;
+begin
+  DataSet.Insert;
+end;
+procedure TAbstractDBDataset.Append;
+begin
+  DataSet.Append;
+end;
+
+procedure TAbstractDBDataset.First;
+begin
+  DataSet.First;
+end;
+
+procedure TAbstractDBDataset.Last;
+begin
+  DataSet.Last;
+end;
+
+procedure TAbstractDBDataset.Next;
+begin
+  DataSet.Next;
+end;
+procedure TAbstractDBDataset.Prior;
+begin
+  DataSet.Prior;
+end;
+
+procedure TAbstractDBDataset.Post;
+begin
+  if CanEdit then
+    FDataSet.Post;
+end;
+
+procedure TAbstractDBDataset.Edit;
+begin
+  if not CanEdit then
+    DataSet.Edit;
+end;
+
+procedure TAbstractDBDataset.Cancel;
+begin
+  if Assigned(FDataSet) and (FDataSet.Active) then
+    FDataSet.Cancel;
+end;
+
+function TAbstractDBDataset.Locate(const keyfields: string;
+  const keyvalues: Variant; options: TLocateOptions): boolean;
+begin
+  Result := False;
+  if DataSet.Active then
+    Result := DataSet.Locate(keyfields,keyvalues,options);
+end;
+
+function TAbstractDBDataset.EOF: Boolean;
+begin
+  Result := True;
+  if Assigned(FDataSet) and (FDataSet.Active) then
+    Result := FDataSet.EOF;
+end;
+
+function TAbstractDBDataset.FieldByName(const aFieldName: string): TField;
+begin
+  Result := nil;
+  if Assigned(DataSet) then
+    begin
+      if not DataSet.Active and FWasOpen then
+        Open;
+      if DataSet.FieldDefs.IndexOf(aFieldName)>=0 then
+        Result := DataSet.FieldByName(aFieldname);
+    end;
+end;
+
 function TAbstractDBDataset.CheckForInjection(aQuery: string): Boolean;
 begin
   Result := False;
+end;
+
+function TAbstractDBDataset.GetCaption: string;
+begin
+  with FDataSet as IBaseManageDB do
+    Result := GetTableCaption;
+end;
+function TAbstractDBDataset.GetCanEdit: Boolean;
+begin
+  Result := Assigned(Self) and (Self is TAbstractDBDataset) and Assigned(fdataSet) and (FDataSet.State = dsEdit) or (FDataSet.State = dsInsert);
+end;
+
+function TAbstractDBDataset.GetActive: Boolean;
+begin
+  Result := False;
+  if Assigned(FDataSet) then
+    Result := FDataSet.Active;
+end;
+
+function TAbstractDBDataset.GetCount: Integer;
+begin
+  if DataSet.Active then
+    Result := DataSet.RecordCount
+  else
+    Result := -1;
+end;
+function TAbstractDBDataset.GetConnection: TComponent;
+begin
+  with FDataSet as IBaseManageDB do
+    Result := GetConnection;
+end;
+function TAbstractDBDataset.GetFilter: string;
+begin
+  result := '';
+  if not Assigned(DataSet) then exit;
+  with DataSet as IBaseDbFilter do
+    Result := Filter;
+end;
+function TAbstractDBDataset.GetFRows: Integer;
+begin
+  result := -1;
+  if not Assigned(DataSet) then exit;
+  with DataSet as IBaseDbFilter do
+    Result := FetchRows;
+end;
+function TAbstractDBDataset.GetFullCount: Integer;
+var
+  aDS: TDataSet;
+  aFilter: String;
+begin
+  if TAbstractDBModule(DataModule).IsSQLDB then
+    begin
+      with FDataSet as IBaseManageDB,FDataSet as IBaseDbFilter do
+        begin
+          aDS := TAbstractDBModule(DataModule).GetNewDataSet('select count(*) from '+TAbstractDBModule(DataModule).QuoteField(GetTableName),Connection);
+        end;
+      aDS.Open;
+      if aDS.RecordCount>0 then
+        Result := aDS.Fields[0].AsInteger;
+      aDS.Free;
+    end
+  else
+    Result := Count;
+end;
+
+function TAbstractDBDataset.GetLimit: Integer;
+begin
+  result := -1;
+  if not Assigned(DataSet) then exit;
+  with DataSet as IBaseDbFilter do
+    Result := Limit;
+end;
+
+function TAbstractDBDataset.GetIsReadOnly: Boolean;
+begin
+  with DataSet as IBaseManageDB do
+    Result := AsReadonly;
+end;
+
+function TAbstractDBDataset.GetSortDirection: TSortDirection;
+begin
+  if not Assigned(DataSet) then exit;
+  with DataSet as IBaseDbFilter do
+    Result := GetSortDirection;
+end;
+
+function TAbstractDBDataset.GetSortFields: string;
+begin
+  if not Assigned(DataSet) then exit;
+  with DataSet as IBaseDbFilter do
+    Result := GetSortFields;
+end;
+
+function TAbstractDBDataset.GetState: TDataSetState;
+begin
+  if Assigned(FDataSet) then
+    Result := FDataSet.State;
+end;
+
+function TAbstractDBDataset.GetTableName: string;
+begin
+  Result := '';
+  if Supports(FDataSet,IBaseManageDB) then
+    with FDataSet as IBaseManageDB do
+      Result := GetTableName;
+end;
+
+procedure TAbstractDBDataset.SetActive(AValue: Boolean);
+begin
+  if (not AValue) and Active then
+    Close
+  else if AValue and (not Active) then
+    Open;
+end;
+procedure TAbstractDBDataset.SetFilter(AValue: string);
+begin
+  with DataSet as IBaseDbFilter do
+    Filter := AValue;
+end;
+procedure TAbstractDBDataset.SetFRows(AValue: Integer);
+begin
+  with DataSet as IBaseDbFilter do
+    FetchRows := aValue;
+end;
+
+procedure TAbstractDBDataset.SetLimit(AValue: Integer);
+begin
+  with DataSet as IBaseDbFilter do
+    Limit := aValue;
+end;
+
+procedure TAbstractDBDataset.SetIsReadOnly(AValue: Boolean);
+begin
+  with DataSet as IBaseManageDB do
+    AsReadonly := AValue;
+end;
+
+procedure TAbstractDBDataset.SetSortDirection(AValue: TSortDirection);
+begin
+  if not Assigned(DataSet) then exit;
+  with DataSet as IBaseDbFilter do
+    SetSortDirection(AValue);
+end;
+
+procedure TAbstractDBDataset.SetSortFields(AValue: string);
+begin
+  if not Assigned(DataSet) then exit;
+  with DataSet as IBaseDbFilter do
+    SetSortFields(AValue);
+end;
+procedure TAbstractDBDataset.Open;
+var
+  Retry: Boolean = False;
+  aCreated: Boolean = False;
+  aOldFilter: String = '';
+  aOldLimit: Integer;
+  aErr, OldFields: String;
+  OldLimit: Integer;
+begin
+  if not Assigned(FDataSet) then exit;
+  if FDataSet.Active then
+    begin
+      FDataSet.Refresh;
+      exit;
+    end;
+  try
+  with FDataSet as IBaseManageDB do
+    if (Assigned(DataModule)) and (TAbstractDBModule(DataModule).ShouldCheckTable(TableName,True)) then
+      begin
+        if not Self.CreateTable then
+          begin
+            with FDataSet as IBaseDbFilter do
+              begin
+                OldFields := Fields;
+                Fields := '';
+                OldLimit := Limit;
+                Limit := 1;
+              end;
+            with DataSet as IBaseManageDB do
+              FDataSet.Open;
+            if (not TAbstractDBModule(DataModule).IsTransactionActive(Connection)) and AlterTable then
+            else if (not TAbstractDBModule(DataModule).IsTransactionActive(Connection)) then
+              begin
+//                with BaseApplication as IBaseApplication do
+//                  Info('Table "'+TableName+'" altering failed ');
+              end;
+            with FDataSet as IBaseDbFilter do
+              begin
+                Fields := OldFields;
+                Limit := OldLimit;
+              end;
+          end;
+      end;
+  except
+  end;
+  with DataSet as IBaseManageDB do
+    FDataSet.Open;
+  if FDataSet.Active then FWasOpen:=True;
+end;
+
+procedure TAbstractDBDataset.Close;
+begin
+  if not Assigned(FDataSet) then exit;
+  FDataSet.Close;
+end;
+
+procedure TAbstractDBDataset.DefineFields(aDataSet: TDataSet);
+begin
+end;
+
+procedure TAbstractDBDataset.DefineDefaultFields(aDataSet: TDataSet;
+  HasMasterSource: Boolean);
+begin
+end;
+
+procedure TAbstractDBDataset.DefineUserFields(aDataSet: TDataSet);
+begin
 end;
 
 end.
