@@ -21,15 +21,15 @@ unit usqldbdm;
 {$mode objfpc}{$H+}
 interface
 uses
-  Classes, SysUtils, db, uModifiedDS,sqldb,Utils,
-  uBaseDatasetInterfaces,syncobjs,uBaseDBInterface,uBaseDbClasses,
+  Classes, SysUtils, db, sqldb,
+  uBaseDatasetInterfaces,syncobjs,uAbstractDBLayer,
   dateutils;
 type
   TUnprotectedDataSet = class(TDataSet);
 
   { TSQLDbDBDM }
 
-  TSQLDbDBDM = class(TBaseDBModule)
+  TSQLDbDBDM = class(TAbstractDBModule)
     procedure FConnectionAfterConnect(Sender: TObject);
     procedure FConnectionBeforeConnect(Sender: TObject);
   private

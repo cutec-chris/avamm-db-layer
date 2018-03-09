@@ -23,8 +23,8 @@ interface
 uses
   Classes, SysUtils, db, ZConnection, ZSqlMetadata,
   ZAbstractRODataset, ZDataset, ZSequence,ZAbstractConnection,
-  uModifiedDS,ZSqlMonitor,Utils,uBaseDatasetInterfaces,syncobjs,
-  uBaseDBInterface,uBaseDbClasses,ZCompatibility,dateutils,pingsend,
+  ZSqlMonitor,uBaseDatasetInterfaces,syncobjs,
+  ZCompatibility,dateutils,pingsend,
   uAbstractDBLayer;
 type
   TUnprotectedDataSet = class(TDataSet);
@@ -32,7 +32,7 @@ type
 
   { TZeosDBDM }
 
-  TZeosDBDM = class(TBaseDBModule)
+  TZeosDBDM = class(TAbstractDBModule)
     procedure MonitorTrace(Sender: TObject; Event: TZLoggingEvent;
       var LogTrace: Boolean);
   private
