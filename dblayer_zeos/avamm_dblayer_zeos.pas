@@ -2,20 +2,14 @@
   This source is only used to compile and install the package.
  }
 
-unit avammdblayer;
+unit avamm_dblayer_zeos;
 
 {$warn 5023 off : no warning about unused units}
 interface
 
 uses
-  uBaseDatasetInterfaces, uAbstractDBLayer, uEncrypt, LazarusPackageIntf;
+  uZeosDBDM;
 
 implementation
 
-procedure Register;
-begin
-end;
-
-initialization
-  RegisterPackage('avammdblayer', @Register);
 end.

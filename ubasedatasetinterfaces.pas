@@ -164,6 +164,9 @@ type
     function IsConnected : Boolean;
     function GetLimitAfterSelect : Boolean;
     function GetLimitSTMT : string;
+    function GetUniID(aConnection : TComponent;Generator : string;Tablename : string;AutoInc : Boolean) : Variant;
+    function GetSyncOffset: Integer;
+    procedure SetSyncOffset(const AValue: Integer);
   end;
 
   { TAbstractDBDataset }

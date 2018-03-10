@@ -2,13 +2,13 @@
   This source is only used to compile and install the package.
  }
 
-unit avammdblayer;
+unit avamm_dblayer_sqldb;
 
 {$warn 5023 off : no warning about unused units}
 interface
 
 uses
-  uBaseDatasetInterfaces, uAbstractDBLayer, uEncrypt, LazarusPackageIntf;
+  usqldbdm, LazarusPackageIntf;
 
 implementation
 
@@ -17,5 +17,5 @@ begin
 end;
 
 initialization
-  RegisterPackage('avammdblayer', @Register);
+  RegisterPackage('avamm_dblayer_sqldb', @Register);
 end.

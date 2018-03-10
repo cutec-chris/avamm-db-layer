@@ -28,6 +28,8 @@ type
     FTables: TStrings;
     FTriggers: TStrings;
     FProperties: String;
+    function GetSyncOffset: Integer;virtual;
+    procedure SetSyncOffset(AValue: Integer);virtual;
   protected
     function GetConnection: TAbstractDBConnection;virtual;abstract;
     function GetLimitAfterSelect: Boolean;virtual;
@@ -58,6 +60,7 @@ type
     property LimitAfterSelect : Boolean read GetLimitAfterSelect;
     property LimitSTMT : string read GetLimitSTMT;
     function IsSQLDB : Boolean;virtual;
+    property SyncOffset : Integer read GetSyncOffset write SetSyncOffset;
 
     function SetProperties(aProp : string;Connection : TAbstractDBConnection = nil) : Boolean;virtual;
     function CreateDBFromProperties(aProp : string;Connection : TAbstractDBConnection = nil) : Boolean;virtual;
@@ -66,6 +69,7 @@ type
 
     function ExecuteDirect(aSQL: string; aConnection: TComponent=nil): Integer;virtual;
 
+    function GetUniID(aConnection : TComponent = nil;Generator : string = 'GEN_SQL_ID';Tablename : string = '';AutoInc : Boolean = True) : Variant;virtual;
     function DateToFilter(aValue : TDateTime) : string;virtual;
     function DateTimeToFilter(aValue : TDateTime) : string;virtual;
     function QuoteField(aField : string) : string;virtual;
@@ -108,6 +112,16 @@ end;
 function TAbstractDBModule.IsSQLDB: Boolean;
 begin
   Result := GetDBLayerType='SQL';
+end;
+
+function TAbstractDBModule.GetSyncOffset: Integer;
+begin
+  Result := (MainConnection as IBaseDBConnection).GetSyncOffset;
+end;
+
+procedure TAbstractDBModule.SetSyncOffset(AValue: Integer);
+begin
+  (MainConnection as IBaseDBConnection).SetSyncOffset(AValue);
 end;
 
 function TAbstractDBModule.GetLimitAfterSelect: Boolean;
@@ -338,6 +352,14 @@ begin
   if aConnection = nil then
     aConnection := MainConnection;
   Result := (aConnection as IBaseDBConnection).DoExecuteDirect(aSQL);
+end;
+
+function TAbstractDBModule.GetUniID(aConnection: TComponent; Generator: string;
+  Tablename: string; AutoInc: Boolean): Variant;
+begin
+  if aConnection = nil then
+    aConnection := MainConnection;
+  Result := (aConnection as IBaseDBConnection).GetUniID(aConnection,Generator,Tablename,AutoInc);
 end;
 
 function TAbstractDBModule.DateToFilter(aValue: TDateTime): string;

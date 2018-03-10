@@ -11,15 +11,19 @@
         <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
     </CompilerOptions>
-    <Files Count="2">
+    <Files Count="3">
       <Item1>
         <Filename Value="ubasedatasetinterfaces.pas"/>
         <UnitName Value="uBaseDatasetInterfaces"/>
       </Item1>
       <Item2>
         <Filename Value="uabstractdblayer.pas"/>
-        <UnitName Value="avammdblayer"/>
+        <UnitName Value="uAbstractDBLayer"/>
       </Item2>
+      <Item3>
+        <Filename Value="uencrypt.pas"/>
+        <UnitName Value="uEncrypt"/>
+      </Item3>
     </Files>
     <RequiredPkgs Count="1">
       <Item1>

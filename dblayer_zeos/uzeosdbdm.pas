@@ -24,7 +24,7 @@ uses
   Classes, SysUtils, db, ZConnection, ZSqlMetadata,
   ZAbstractRODataset, ZDataset, ZSequence,ZAbstractConnection,
   ZSqlMonitor,uBaseDatasetInterfaces,syncobjs,
-  ZCompatibility,dateutils,pingsend,
+  ZCompatibility,dateutils,
   uAbstractDBLayer;
 type
   TUnprotectedDataSet = class(TDataSet);
@@ -48,25 +48,9 @@ type
     function GetConnectionClass : TComponentClass;override;
   protected
     Sequence : TZSequence;
-    function GetSyncOffset: Integer;override;
-    procedure SetSyncOffset(const AValue: Integer);override;
   public
     constructor Create(AOwner : TComponent);override;
     destructor Destroy;override;
-    procedure DestroyDataSet(DataSet : TDataSet);override;
-    function Ping(aConnection : TComponent) : Boolean;override;
-    function GetUniID(aConnection : TComponent = nil;Generator : string = 'GEN_SQL_ID';Tablename : string = '';AutoInc : Boolean = True) : Variant;override;
-    procedure StreamToBlobField(Stream : TStream;DataSet : TDataSet;Fieldname : string;Tablename : string = '');override;
-    function BlobFieldStream(DataSet: TDataSet; Fieldname: string;Tablename : string = ''): TStream;
-      override;
-    function GetErrorNum(e: EDatabaseError): Integer; override;
-    procedure DeleteExpiredSessions;override;
-    function IsTransactionActive(aConnection : TComponent): Boolean;override;
-    function GetDBType: string; override;
-    function GetDBLayerType : string;override;
-    function CreateTrigger(aTriggerName: string; aTableName: string;
-      aUpdateOn: string; aSQL: string;aField : string = ''; aConnection: TComponent=nil): Boolean;
-      override;
   end;
 
   { TZeosConnection }
@@ -93,10 +77,14 @@ type
     procedure DoDisconnect;
     procedure DoConnect;
     function GetDatabaseName: string;
+    function GetUniID(aConnection: TComponent; Generator: string;
+      Tablename: string; AutoInc: Boolean): Variant;
     function IsConnected: Boolean;
     function GetLimitAfterSelect: Boolean;
     function GetLimitSTMT: string;
     function DoGetDBLayerType: string;
+    function GetSyncOffset: Integer;
+    procedure SetSyncOffset(const AValue: Integer);
   protected
   end;
 
@@ -118,7 +106,7 @@ type
     FDefaultTableName : string;
     FManagedFieldDefs : TFieldDefs;
     FManagedIndexDefs : TIndexDefs;
-    FOrigTable : TBaseDBDataSet;
+    FOrigTable : TAbstractDBDataset;
     FUsePermissions : Boolean;
     FTableCaption : string;
     FDistinct : Boolean;
@@ -228,7 +216,7 @@ type
     function NumRowsAffected: Integer;
   end;
 implementation
-uses ZDbcIntfs,uBaseApplication,uEncrypt;
+uses ZDbcIntfs,uEncrypt;
 resourcestring
   strUnknownDbType                = 'Unbekannter Datenbanktyp';
   strDatabaseConnectionLost       = 'Die Datenbankverbindung wurde verlohren !';
@@ -242,9 +230,9 @@ var
   actVer: LongInt;
   sl: TStringList;
 begin
-  if Assigned(BaseApplication) then
-    with BaseApplication as IBaseDBInterface do
-      LastError := '';
+//  if Assigned(BaseApplication) then
+//    with BaseApplication as IBaseDBInterface do
+//      LastError := '';
   FProperties := aProp;
   Result := True;
   tmp := aProp;
@@ -368,11 +356,9 @@ begin
       Connected:=True;
     except
       on e : Exception do
-      if Assigned(BaseApplication) then
-        with BaseApplication as IBaseDBInterface do
-          begin
-            LastError := e.Message;
-          end;
+//      if Assigned(BaseApplication) then
+//        with BaseApplication as IBaseDBInterface do
+//          LastError := e.Message;
     end;
     if (copy(Protocol,0,8) = 'postgres')
     then
@@ -462,9 +448,9 @@ begin
     Connect;
   except on e : Exception do
     begin
-      if Assigned(BaseApplication) then
-        with BaseApplication as IBaseDBInterface do
-          LastError := e.Message;
+//      if Assigned(BaseApplication) then
+//        with BaseApplication as IBaseDBInterface do
+//          LastError := e.Message;
     end;
   end;
 end;
@@ -547,13 +533,13 @@ begin
   if (FieldDefs.IndexOf('AUTO_ID') = -1) and (FieldDefs.IndexOf('SQL_ID') > -1) and  FieldByName('SQL_ID').IsNull then
     begin
       with Self as IBaseManageDB do
-        FieldByName('SQL_ID').AsVariant:=TBaseDBModule(Self.Owner).GetUniID(Connection,'GEN_SQL_ID',TableName);
+        FieldByName('SQL_ID').AsVariant:=TAbstractDBModule(Self.Owner).GetUniID(Connection,'GEN_SQL_ID',TableName);
       FHasNewID:=True;
     end
   else if (FieldDefs.IndexOf('SQL_ID') = -1) and (FieldDefs.IndexOf('AUTO_ID') > -1) and FieldByName('AUTO_ID').IsNull then
     begin
       with Self as IBaseManageDB do
-        FieldByName('AUTO_ID').AsVariant:=TBaseDBModule(Self.Owner).GetUniID(Connection,'GEN_AUTO_ID',TableName);
+        FieldByName('AUTO_ID').AsVariant:=TAbstractDBModule(Self.Owner).GetUniID(Connection,'GEN_AUTO_ID',TableName);
       FHasNewID:=True;
     end;
 end;
@@ -571,10 +557,10 @@ begin
       Result := FTableNames;
       if Result = '' then
         begin
-          Result := TBaseDBModule(Owner).GetFullTableName(GetTableName);
+          Result := TAbstractDBModule(Owner).GetFullTableName(GetTableName);
           DoQuote:=(pos('.',Result)>0) or DoQuote;
         end
-      else Result := TBaseDBModule(Owner).QuoteField(Result);
+      else Result := TAbstractDBModule(Owner).QuoteField(Result);
       exit;
     end;
   tmp := FTableNames+',';
@@ -583,8 +569,8 @@ begin
   tmp := copy(tmp,pos(',',tmp)+1,length(tmp));
   while pos(',',tmp) > 0 do
     begin
-      Result := Result+ ' inner join '+TBaseDBModule(Owner).QuoteField(copy(tmp,0,pos(',',tmp)-1))+' on '+TBaseDBModule(Owner).QuoteField(copy(tmp,0,pos(',',tmp)-1))+'.REF_ID='+aDS+'.SQL_ID';
-      aDS := TBaseDBModule(Owner).QuoteField(copy(tmp,0,pos(',',tmp)-1));
+      Result := Result+ ' inner join '+TAbstractDBModule(Owner).QuoteField(copy(tmp,0,pos(',',tmp)-1))+' on '+TAbstractDBModule(Owner).QuoteField(copy(tmp,0,pos(',',tmp)-1))+'.REF_ID='+aDS+'.SQL_ID';
+      aDS := TAbstractDBModule(Owner).QuoteField(copy(tmp,0,pos(',',tmp)-1));
       tmp := copy(tmp,pos(',',tmp)+1,length(tmp));
     end;
 end;
@@ -703,7 +689,7 @@ begin
         Result += 'FROM '+BuildJoins+' WHERE ('+aFilter+')';
       Result := StringReplace(Result,' WHERE () AND ','WHERE ',[]);
       Result := StringReplace(Result,' WHERE ()','',[]);
-      //if (copy(TZConnection(TBaseDBModule(Owner).MainConnection).Protocol,0,5) = 'mssql') and DoQuote then
+      //if (copy(TZConnection(TAbstractDBModule(Owner).MainConnection).Protocol,0,5) = 'mssql') and DoQuote then
       //  Result := '('+Result+')';
       if (FSortFields <> '') and ((FSortDirection <> sdIgnored) or (FBaseSortDirection <> sdIgnored)) then
         begin
@@ -718,7 +704,7 @@ begin
     end
   else
     Result := SQL.text;
-  if Assigned(FOrigTable) then TBaseDBModule(ForigTable.DataModule).LastStatement := Result;
+  if Assigned(FOrigTable) then TAbstractDBModule(ForigTable.DataModule).LastStatement := Result;
 end;
 function TZeosDBDataSet.IndexExists(IndexName: string): Boolean;
 var
@@ -727,29 +713,29 @@ var
 begin
   CustomQuery := TZQuery.Create(Self);
   CustomQuery.Connection := Connection;
-  if (copy(TZConnection(TBaseDBModule(Owner).MainConnection).Protocol,0,8) = 'firebird')
-  or (copy(TZConnection(TBaseDBModule(Owner).MainConnection).Protocol,0,9) = 'interbase') then
+  if (copy(TZConnection(TAbstractDBModule(Owner).MainConnection).Protocol,0,8) = 'firebird')
+  or (copy(TZConnection(TAbstractDBModule(Owner).MainConnection).Protocol,0,9) = 'interbase') then
     begin
       CustomQuery.SQL.Text := 'select rdb$index_name from rdb$indices where rdb$index_name='+TZeosDBDM(Owner).QuoteValue(indexname);
       CustomQuery.Open;
       Result := CustomQuery.RecordCount > 0;
       CustomQuery.Close;
     end
-  else if (copy(TZConnection(TBaseDBModule(Owner).MainConnection).Protocol,0,6) = 'sqlite') then
+  else if (copy(TZConnection(TAbstractDBModule(Owner).MainConnection).Protocol,0,6) = 'sqlite') then
     begin
       CustomQuery.SQL.Text := 'select name from SQLITE_MASTER where "TYPE"=''index'' and NAME='+TZeosDBDM(Owner).QuoteValue(indexname);
       CustomQuery.Open;
       Result := CustomQuery.RecordCount > 0;
       CustomQuery.Close;
     end
-  else if (copy(TZConnection(TBaseDBModule(Owner).MainConnection).Protocol,0,5) = 'mssql') then
+  else if (copy(TZConnection(TAbstractDBModule(Owner).MainConnection).Protocol,0,5) = 'mssql') then
     begin
       CustomQuery.SQL.Text := 'select name from dbo.sysindexes where NAME='+TZeosDBDM(Owner).QuoteValue(indexname);
       CustomQuery.Open;
       Result := CustomQuery.RecordCount > 0;
       CustomQuery.Close;
     end
-  else if (copy(TZConnection(TBaseDBModule(Owner).MainConnection).Protocol,0,8) = 'postgres') then
+  else if (copy(TZConnection(TAbstractDBModule(Owner).MainConnection).Protocol,0,8) = 'postgres') then
     begin
       CustomQuery.SQL.Text := 'select * from pg_class where relname='+TZeosDBDM(Owner).QuoteValue(indexname);
       CustomQuery.Open;
@@ -758,10 +744,10 @@ begin
     end
   else
     begin
-      Metadata := TZSQLMetaData.Create(TZConnection(TBaseDBModule(Owner).MainConnection));
+      Metadata := TZSQLMetaData.Create(TZConnection(TAbstractDBModule(Owner).MainConnection));
       MetaData.Connection := Connection;
       MetaData.MetadataType:=mdIndexInfo;
-      Metadata.Catalog:=TZConnection(TBaseDBModule(Owner).MainConnection).Catalog;
+      Metadata.Catalog:=TZConnection(TAbstractDBModule(Owner).MainConnection).Catalog;
       Metadata.TableName:=copy(indexname,0,pos('_',indexname)-1);
       MetaData.Filter:='INDEX_NAME='+TZeosDBDM(Owner).QuoteValue(indexname);
       MetaData.Filtered:=True;
@@ -822,7 +808,7 @@ begin
   if Connection.Protocol='mysql' then
     Properties.Values['ValidateUpdateCount'] := 'False';
   if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
-    TBaseDBModule(ForigTable.DataModule).LastTime := GetTicks;
+    TAbstractDBModule(ForigTable.DataModule).LastTime := GetTicks;
   if TZeosDBDM(Owner).IgnoreOpenRequests then exit;
   if FFirstOpen then
     begin
@@ -833,7 +819,7 @@ begin
       FFirstOpen:=False;
     end;
   if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
-    TBaseDBModule(ForigTable.DataModule).CriticalSection.Enter;
+    TAbstractDBModule(ForigTable.DataModule).CriticalSection.Enter;
   try
       try
         inherited InternalOpen;
@@ -921,7 +907,7 @@ begin
             end;
   finally
     if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
-      TBaseDBModule(ForigTable.DataModule).CriticalSection.Leave;
+      TAbstractDBModule(ForigTable.DataModule).CriticalSection.Leave;
   end;
 end;
 
@@ -929,7 +915,7 @@ procedure TZeosDBDataSet.InternalRefresh;
 begin
   if TZeosDBDM(Owner).IgnoreOpenRequests then exit;
   if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
-    TBaseDBModule(ForigTable.DataModule).CriticalSection.Enter;
+    TAbstractDBModule(ForigTable.DataModule).CriticalSection.Enter;
   try
   try
     inherited InternalRefresh;
@@ -948,7 +934,7 @@ begin
   end;
   finally
     if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
-      TBaseDBModule(ForigTable.DataModule).CriticalSection.Leave;
+      TAbstractDBModule(ForigTable.DataModule).CriticalSection.Leave;
   end;
 end;
 
@@ -990,8 +976,8 @@ begin
       {$ENDIF}
       with BaseApplication as IBaseDBInterface do
         begin
-          if TBaseDBModule(ForigTable.DataModule).Users.DataSet.Active and ((FieldDefs.IndexOf('CREATEDBY') > -1) or (FieldDefs.IndexOf('CHANGEDBY') > -1)) then
-            UserCode := TBaseDBModule(ForigTable.DataModule).Users.IDCode.AsString
+          if TAbstractDBModule(ForigTable.DataModule).Users.DataSet.Active and ((FieldDefs.IndexOf('CREATEDBY') > -1) or (FieldDefs.IndexOf('CHANGEDBY') > -1)) then
+            UserCode := TAbstractDBModule(ForigTable.DataModule).Users.IDCode.AsString
           else UserCode := 'SYS';
           if (FieldDefs.IndexOf('CREATEDBY') > -1) and (FieldByName('CREATEDBY').IsNull) then
             FieldByName('CREATEDBY').AsString:=UserCode;
@@ -1633,7 +1619,7 @@ begin
       Result := PingHost(TZConnection(aConnection).HostName)>-1;//Unsupported
   end;
 end;
-function TZeosDBDM.GetUniID(aConnection : TComponent = nil;Generator : string = 'GEN_SQL_ID';Tablename : string = '';AutoInc : Boolean = True): Variant;
+function TZeosConnection.GetUniID(aConnection : TComponent;Generator : string;Tablename : string;AutoInc : Boolean): Variant;
 var
   Statement: IZStatement;
   ResultSet: IZResultSet;
