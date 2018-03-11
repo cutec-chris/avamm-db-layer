@@ -17,8 +17,24 @@ type
     property DataSet : TDataSet read FDataSet write FDataSet;
   end;
 
-  TAbstractDBConnection = class(TComponent);//IBaseDBConnection
-  TAbstractDBQuery = class(TDataSet);//IBaseDBFilter,IBaseManageDB,IBaseSubDatasets,IBaseModifiedDS
+  { TAbstractDBConnection }
+
+  TAbstractDBConnection = class(TComponent)
+  public
+    function DoSetProperties(aProp : string) : Boolean;
+    function DoCreateDBFromProperties(aProp : string) : Boolean;
+    function Handle : Pointer;
+  end;
+
+  { TAbstractDBQuery }
+
+  TAbstractDBQuery = class(TDataSet)
+  private
+    function GetSQL: string;
+    procedure SetSQL(AValue: string);
+  public
+    property SQL : string read GetSQL write SetSQL;
+  end;//IBaseDBFilter,IBaseManageDB,IBaseSubDatasets,IBaseModifiedDS
 
   { TAbstractDBModule }
 
@@ -36,14 +52,15 @@ type
     FTriggers: TStrings;
     FProperties: String;
     FUsersFilter: string;
+    FMainConnection: TAbstractDBConnection;
     function GetSyncOffset: Integer;virtual;
     procedure SetSyncOffset(AValue: Integer);virtual;
   protected
-    function GetConnection: TAbstractDBConnection;virtual;abstract;
+    function GetConnection: TAbstractDBConnection;virtual;
     function GetLimitAfterSelect: Boolean;virtual;
     function GetLimitSTMT: string;virtual;
-    function GetDataSetClass : TDatasetClass;virtual;abstract;
-    function GetConnectionClass : TComponentClass;virtual;abstract;
+    function GetDataSetClass : TDatasetClass;virtual;
+    function GetConnectionClass : TComponentClass;virtual;
     property UsersFilter : string read FUsersFilter;
   public
     constructor Create(AOwner: TComponent); override;
@@ -110,6 +127,35 @@ resourcestring
   strSQLInjection                = 'Versuchte SQL Injection !';
 implementation
 
+{ TAbstractDBQuery }
+
+function TAbstractDBQuery.GetSQL: string;
+begin
+  Result := (Self as IBaseDbFilter).GetSQL;
+end;
+
+procedure TAbstractDBQuery.SetSQL(AValue: string);
+begin
+  (Self as IBaseDbFilter).FullSQL := AValue;
+end;
+
+{ TAbstractDBConnection }
+
+function TAbstractDBConnection.DoSetProperties(aProp: string): Boolean;
+begin
+  Result := (Self as IBaseDBConnection).DoSetProperties(aProp);
+end;
+
+function TAbstractDBConnection.DoCreateDBFromProperties(aProp: string): Boolean;
+begin
+  Result := (Self as IBaseDBConnection).DoCreateDBFromProperties(aProp);
+end;
+
+function TAbstractDBConnection.Handle: Pointer;
+begin
+  Result := (Self as IBaseDBConnection).GetHandle;
+end;
+
 { TInternalDBDataSet }
 
 destructor TInternalDBDataSet.Destroy;
@@ -144,6 +190,18 @@ begin
   (MainConnection as IBaseDBConnection).SetSyncOffset(AValue);
 end;
 
+function TAbstractDBModule.GetConnection: TAbstractDBConnection;
+var
+  aClass: TComponentClass;
+begin
+  if not Assigned(FMainConnection) then
+    begin
+      aClass := GetConnectionClass;
+      FMainConnection := TAbstractDBConnection(aClass.Create(Self));
+    end;
+  Result := FMainConnection;
+end;
+
 function TAbstractDBModule.GetLimitAfterSelect: Boolean;
 begin
   Result := (MainConnection as IBaseDBConnection).GetLimitAfterSelect;
@@ -152,6 +210,16 @@ end;
 function TAbstractDBModule.GetLimitSTMT: string;
 begin
   Result := (MainConnection as IBaseDBConnection).GetLimitSTMT;
+end;
+
+function TAbstractDBModule.GetDataSetClass: TDatasetClass;
+begin
+  Result := QueryClass;
+end;
+
+function TAbstractDBModule.GetConnectionClass: TComponentClass;
+begin
+  Result := ConnectionClass;
 end;
 
 constructor TAbstractDBModule.Create(AOwner: TComponent);
@@ -200,8 +268,11 @@ end;
 
 function TAbstractDBModule.GetNewDataSet(aSQL: string; aConnection: TComponent;
   MasterData: TDataSet; aOrigtable: TAbstractDBDataset): TDataSet;
+var
+  aClass: TDatasetClass;
 begin
-  Result := GetDataSetClass.Create(Self);
+  aClass := GetDataSetClass;
+  Result := aClass.Create(Self);
   if not Assigned(aConnection) then
     aConnection := MainConnection;
   with TAbstractDBQuery(Result) as IBaseManageDB,TAbstractDBQuery(Result) as IBaseDbFilter do
@@ -286,8 +357,11 @@ begin
   if Connection=nil then
     Connection := MainConnection;
   Result := (Connection as IBaseDBConnection).DoSetProperties(aProp);
-  (Connection as IBaseDBConnection).DoConnect;
-  Result := Result and ((Connection as IBaseDBConnection).IsConnected) and (Connection as IBaseDBConnection).DoInitializeConnection;
+  if Result then
+    begin
+      (Connection as IBaseDBConnection).DoConnect;
+      Result := Result and ((Connection as IBaseDBConnection).IsConnected) and (Connection as IBaseDBConnection).DoInitializeConnection;
+    end;
   Tables.Clear;
   CheckedTables.Clear;
 end;

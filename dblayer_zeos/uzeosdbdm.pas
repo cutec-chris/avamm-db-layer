@@ -28,8 +28,6 @@ uses
   uAbstractDBLayer;
 type
   TUnprotectedDataSet = class(TDataSet);
-  TZeosConnection = class;
-
   { TZeosConnection }
 
   TZeosConnection = class(TZConnection,IBaseDBConnection)
@@ -53,6 +51,7 @@ type
     function DoRollbackTransaction: Boolean;
     procedure DoDisconnect;
     procedure DoConnect;
+    function GetHandle : Pointer;
     function GetDatabaseName: string;
     function GetUniID(aConnection: TComponent; Generator: string;
       Tablename: string; AutoInc: Boolean): Variant;
@@ -194,7 +193,7 @@ type
     function NumRowsAffected: Integer;
   end;
 implementation
-uses ZDbcIntfs,uEncrypt;
+uses ZDbcIntfs,uEncrypt,ZDbcSqLite;
 resourcestring
   strUnknownDbType                = 'Unbekannter Datenbanktyp';
   strDatabaseConnectionLost       = 'Die Datenbankverbindung wurde verlohren !';
@@ -432,6 +431,12 @@ begin
     end;
   end;
 end;
+
+function TZeosConnection.GetHandle: Pointer;
+begin
+  Result := (DbcConnection as IZSQLiteConnection).GetConnectionHandle;
+end;
+
 function TZeosConnection.GetDatabaseName: string;
 begin
   Result := Database;
@@ -1373,7 +1378,7 @@ begin
 end;
 
 initialization
-  ConnectionClass:=TZConnection;
+  ConnectionClass:=TZeosConnection;
   QueryClass:=TZeosDBDataSet;
 end.
 
