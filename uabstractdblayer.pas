@@ -3,7 +3,7 @@ unit uAbstractDBLayer;
 interface
 
 uses
-  Classes,db,uBaseDatasetInterfaces,sysutils;
+  Classes,db,uBaseDatasetInterfaces,Sysutils,syncobjs;
 
 type
 
@@ -25,9 +25,17 @@ type
   TAbstractDBModule = class(TComponent)
   private
     FCheckedTables : TStrings;
+    FConnect: TNotifyEvent;
+    FConnectionLost: TNotifyEvent;
+    FCS: TCriticalSection;
+    FIgnoreOpenrequests: Boolean;
+    FKeepAlive: TNotifyEvent;
+    FLastStmt: string;
+    FLastTime: Int64;
     FTables: TStrings;
     FTriggers: TStrings;
     FProperties: String;
+    FUsersFilter: string;
     function GetSyncOffset: Integer;virtual;
     procedure SetSyncOffset(AValue: Integer);virtual;
   protected
@@ -36,6 +44,7 @@ type
     function GetLimitSTMT: string;virtual;
     function GetDataSetClass : TDatasetClass;virtual;abstract;
     function GetConnectionClass : TComponentClass;virtual;abstract;
+    property UsersFilter : string read FUsersFilter;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -49,6 +58,7 @@ type
     function CommitTransaction(aConnection : TComponent): Boolean;virtual;
     function RollbackTransaction(aConnection : TComponent): Boolean;virtual;
     function IsTransactionActive(aConnection : TComponent): Boolean;virtual;
+    function Ping(aConnection : TComponent): Boolean;virtual;
 
     property CheckedTables : TStrings read FCheckedTables;
     function ShouldCheckTable(aTableName : string;SetChecked : Boolean = False) : Boolean;
@@ -69,6 +79,7 @@ type
 
     function ExecuteDirect(aSQL: string; aConnection: TComponent=nil): Integer;virtual;
 
+    function BuildSQL(DataSet: TDataSet): string;
     function GetUniID(aConnection : TComponent = nil;Generator : string = 'GEN_SQL_ID';Tablename : string = '';AutoInc : Boolean = True) : Variant;virtual;
     function DateToFilter(aValue : TDateTime) : string;virtual;
     function DateTimeToFilter(aValue : TDateTime) : string;virtual;
@@ -81,6 +92,15 @@ type
     function GetColumns(aTableName : string) : TStrings;
     function DecodeFilter(aSQL : string;Parameters : TStringList;var NewSQL : string) : Boolean;virtual;
     function CheckForInjection(aFilter : string) : Boolean;
+    function GetUSerCode : string;virtual;
+
+    property LastStatement : string read FLastStmt write FLastStmt;
+    property LastTime : Int64 read FLastTime write FLastTime;
+    property CriticalSection : TCriticalSection read FCS;
+    property IgnoreOpenRequests : Boolean read FIgnoreOpenrequests write FIgnoreOpenrequests;
+    property OnConnectionLost : TNotifyEvent read FConnectionLost write FConnectionLost;
+    property OnConnect : TNotifyEvent read FConnect write FConnect;
+    property OnDisconnectKeepAlive : TNotifyEvent read FKeepAlive write FKeepAlive;
   end;
 
 var
@@ -140,12 +160,14 @@ begin
   FTables := TStringList.Create;
   FTriggers := TStringList.Create;
   FCheckedTables := TStringList.Create;
+  FCS := TCriticalSection.Create;
 end;
 
 destructor TAbstractDBModule.Destroy;
 begin
   inherited Destroy;
   FCheckedTables.Free;
+  FCS.Destroy;
 end;
 
 function TAbstractDBModule.GetNewDataSet(aTable: TAbstractDBDataset;
@@ -234,6 +256,11 @@ function TAbstractDBModule.IsTransactionActive(aConnection: TComponent
   ): Boolean;
 begin
   //Result := (aConnection as IBaseDBConnection).IsTransactionActive;
+end;
+
+function TAbstractDBModule.Ping(aConnection: TComponent): Boolean;
+begin
+  Result := True;
 end;
 
 function TAbstractDBModule.ShouldCheckTable(aTableName: string;
@@ -352,6 +379,170 @@ begin
   if aConnection = nil then
     aConnection := MainConnection;
   Result := (aConnection as IBaseDBConnection).DoExecuteDirect(aSQL);
+end;
+
+function TAbstractDBModule.BuildSQL(DataSet: TDataSet): string;
+var
+  DoQuote : Boolean = False;
+
+function BuildJoins : string;
+var
+  aDS : string;
+  tmp: String;
+begin
+  if not (pos(',',(DataSet as IBaseManageDB).GetTableNames) > 0) then
+    begin
+      Result := (DataSet as IBaseManageDB).GetTableNames;
+      if Result = '' then
+        begin
+          Result := GetFullTableName((DataSet as IBaseManageDB).TableName);
+          DoQuote:=(pos('.',Result)>0) or DoQuote;
+        end
+      else Result := QuoteField(Result);
+      exit;
+    end;
+  tmp := (DataSet as IBaseManageDB).GetTableNames+',';
+  Result := copy((DataSet as IBaseManageDB).GetTableNames,0,pos(',',(DataSet as IBaseManageDB).GetTableNames)-1);
+  aDS := Result;
+  tmp := copy(tmp,pos(',',tmp)+1,length(tmp));
+  while pos(',',tmp) > 0 do
+    begin
+      Result := Result+ ' inner join '+QuoteField(copy(tmp,0,pos(',',tmp)-1))+' on '+QuoteField(copy(tmp,0,pos(',',tmp)-1))+'.REF_ID='+aDS+'.SQL_ID';
+      aDS := QuoteField(copy(tmp,0,pos(',',tmp)-1));
+      tmp := copy(tmp,pos(',',tmp)+1,length(tmp));
+    end;
+end;
+
+var
+  aFilter: String;
+  aRefField: String;
+  tmp: String;
+  SResult: String;
+  PJ: String = '';
+  PW: String = '';
+
+  procedure BuildSResult;
+  begin
+    SResult := '';
+    if pos(',',QuoteField((DataSet as IBaseDbFilter).SortFields)) = 0 then
+      begin
+        sResult += QuoteField((DataSet as IBaseManageDB).TableName)+'.'+QuoteField((DataSet as IBaseDbFilter).SortFields);
+        if (DataSet as IBaseDbFilter).SortDirection = sdAscending then
+          sResult += ' ASC'
+        else if (DataSet as IBaseDbFilter).SortDirection = sdDescending then
+          sResult += ' DESC'
+        else
+          begin
+            if (DataSet as IBaseDbFilter).BaseSortDirection = sdAscending then
+              sResult += ' ASC'
+            else if (DataSet as IBaseDbFilter).BaseSortDirection = sdDescending then
+              sResult += ' DESC'
+          end;
+      end
+    else
+      begin
+        tmp := (DataSet as IBaseDbFilter).SortFields;
+        while pos(',',tmp) > 0 do
+          begin
+            sResult += QuoteField((DataSet as IBaseManageDB).TableName)+'.'+QuoteField(copy(tmp,0,pos(',',tmp)-1));
+            tmp := copy(tmp,pos(',',tmp)+1,length(tmp));
+            if (DataSet as IBaseDbFilter).SortDirection = sdAscending then
+              sResult += ' ASC'
+            else
+              sResult += ' DESC';
+            if trim(tmp) > '' then
+              sResult+=',';
+          end;
+        if tmp <> '' then
+          begin
+            sResult += QuoteField((DataSet as IBaseManageDB).TableName)+'.'+QuoteField(tmp);
+            if (DataSet as IBaseDbFilter).SortDirection = sdAscending then
+              sResult += ' ASC'
+            else
+              sResult += ' DESC';
+          end;
+      end;
+  end;
+
+begin
+  if (DataSet as IBaseDbFilter).GetSQL <> '' then
+    begin
+      BuildSResult;
+      if ((DataSet as IBaseManageDB).ManagedFieldDefs.IndexOf('AUTO_ID') = -1) and (UsersFilter <> '') and (DataSet as IBaseDbFilter).UsePermissions and TableExists('PERMISSIONS') then
+        begin
+          PJ := ' LEFT JOIN '+QuoteField('PERMISSIONS')+' ON ('+QuoteField('PERMISSIONS')+'.'+QuoteField('REF_ID_ID')+'='+QuoteField((DataSet as IBaseManageDB).TableName)+'.'+QuoteField('SQL_ID')+')';
+          PW := ' AND ('+aFilter+') AND (('+UsersFilter+') OR '+QuoteField('PERMISSIONS')+'.'+QuoteField('USER')+' is NULL)';
+        end
+      else if ((DataSet as IBaseManageDB).ManagedFieldDefs.IndexOf('AUTO_ID') = -1) and (DataSet as IBaseDbFilter).UsePermissions and TableExists('PERMISSIONS') then
+        begin
+          PJ := ' LEFT JOIN '+QuoteField('PERMISSIONS')+' ON ('+QuoteField('PERMISSIONS')+'.'+QuoteField('REF_ID_ID')+'='+QuoteField((DataSet as IBaseManageDB).TableName)+'.'+QuoteField('SQL_ID')+')';
+          PW := ' AND ('+QuoteField('PERMISSIONS')+'.'+QuoteField('USER')+' is NULL)'
+        end;
+      PW := StringReplace(PW,'AND ()','',[rfReplaceAll]);
+      Result := StringReplace(StringReplace(StringReplace((DataSet as IBaseDbFilter).GetSQL,'@PERMISSIONJOIN@',PJ,[]),'@PERMISSIONWHERE@',PW,[]),'@DEFAULTORDER@',SResult,[]);
+    end
+  else if Assigned((DataSet as IBaseManageDB).GetOrigTable) then
+    begin
+      Result := 'SELECT ';
+      if (DataSet as IBaseDbFilter).Distinct then
+        Result := Result+'DISTINCT ';
+      if LimitAfterSelect and (((DataSet as IBaseDbFilter).Limit > 0)) then
+        Result += Format(LimitSTMT,[':Limit'])+' ';
+      if (DataSet as IBaseDbFilter).Fields = '' then
+        Result += QuoteField((DataSet as IBaseManageDB).TableName)+'.'+'* '
+      else
+        Result += (DataSet as IBaseDbFilter).Fields+' ';
+      aFilter := '';//FIntFilter;
+      if ((DataSet as IBaseDbFilter).BaseFilter <> '') and (aFilter <> '') then
+        aFilter := '('+(DataSet as IBaseDbFilter).BaseFilter+') and ('+aFilter+')'
+      else if ((DataSet as IBaseDbFilter).BaseFilter <> '') then
+        aFilter := '('+(DataSet as IBaseDbFilter).BaseFilter+')';
+      if Assigned((DataSet as IBaseManageDB).DataSource) then
+        begin
+          with Self as IBaseManageDb do
+            begin
+              if ManagedFieldDefs.IndexOf('AUTO_ID') > -1 then
+                aRefField := 'AUTO_ID'
+              else
+                aRefField := 'SQL_ID';
+            end;
+          if (aFilter <> '') and (pos('REF_ID',aFilter)=0) then
+            aFilter := '('+aFilter+') and ('+QuoteField('REF_ID')+'=:'+QuoteField(aRefField)+')'
+          else if (aFilter <> '') then //REF_ID in Filter so we use only the Filter
+            aFilter := '('+aFilter+')'
+          else
+            aFilter := QuoteField('REF_ID')+'=:'+QuoteField(aRefField);
+          if DataSet.FieldDefs.IndexOf('DELETED')>-1 then
+            begin
+              if aFilter <> '' then
+                aFilter += ' AND ';
+              aFilter += QuoteField('DELETED')+'<>'+QuoteValue('Y');
+            end;
+        end;
+      if ((DataSet as IBaseManageDB).ManagedFieldDefs.IndexOf('AUTO_ID') = -1) and (UsersFilter <> '') and (DataSet as IBaseDbFilter).UsePermissions and TableExists('PERMISSIONS') then
+        Result += 'FROM '+BuildJoins+' LEFT JOIN '+QuoteField('PERMISSIONS')+' ON ('+QuoteField('PERMISSIONS')+'.'+QuoteField('REF_ID_ID')+'='+QuoteField((DataSet as IBaseManageDB).TableName)+'.'+QuoteField('SQL_ID')+') WHERE ('+aFilter+') AND (('+UsersFilter+') OR '+QuoteField('PERMISSIONS')+'.'+QuoteField('USER')+' is NULL)'
+      else if ((DataSet as IBaseManageDB).ManagedFieldDefs.IndexOf('AUTO_ID') = -1) and (DataSet as IBaseDbFilter).UsePermissions and TableExists('PERMISSIONS') then
+        Result += 'FROM '+BuildJoins+' LEFT JOIN '+QuoteField('PERMISSIONS')+' ON ('+QuoteField('PERMISSIONS')+'.'+QuoteField('REF_ID_ID')+'='+QuoteField((DataSet as IBaseManageDB).TableName)+'.'+QuoteField('SQL_ID')+') WHERE ('+aFilter+') AND ('+QuoteField('PERMISSIONS')+'.'+QuoteField('USER')+' is NULL)'
+      else
+        Result += 'FROM '+BuildJoins+' WHERE ('+aFilter+')';
+      Result := StringReplace(Result,' WHERE () AND ','WHERE ',[]);
+      Result := StringReplace(Result,' WHERE ()','',[]);
+      //if (copy(TZConnection(MainConnection).Protocol,0,5) = 'mssql') and DoQuote then
+      //  Result := '('+Result+')';
+      if ((DataSet as IBaseDbFilter).SortFields <> '') and (((DataSet as IBaseDbFilter).SortDirection <> sdIgnored) or ((DataSet as IBaseDbFilter).BaseSortDirection <> sdIgnored)) then
+        begin
+          BuildSResult;
+          if (DataSet as IBaseDbFilter).UseBaseSorting then
+            Result += ' ORDER BY '+Format((DataSet as IBaseDbFilter).BaseSorting,[sResult])
+          else
+            Result += ' ORDER BY '+sResult;
+        end;
+      if ((DataSet as IBaseDbFilter).Limit > 0) and (not LimitAfterSelect) then
+        Result += ' '+Format(LimitSTMT,[':Limit']);
+    end
+  else
+    Result := (DataSet as IBaseDbFilter).GetSQL;
+  //LastStatement := Result;
 end;
 
 function TAbstractDBModule.GetUniID(aConnection: TComponent; Generator: string;
@@ -550,6 +741,11 @@ begin
       raise Exception.Create(strSQLInjection);
       Result := True;
     end;
+end;
+
+function TAbstractDBModule.GetUSerCode: string;
+begin
+  Result := '';
 end;
 
 

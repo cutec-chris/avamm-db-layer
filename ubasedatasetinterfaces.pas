@@ -103,6 +103,7 @@ type
     function GetManagedIndexDefs: TIndexDefs;
     function GetTableCaption: string;
     function GetTableName: string;
+    function GetTableNames: string;
     function GetUpChangedBy: Boolean;
     function GetUpStdFields: Boolean;
     function GetUseIntegrity: Boolean;
@@ -115,6 +116,7 @@ type
     procedure SetTableName(const AValue: string);
     procedure SetTableNames(const AValue: string);
     procedure SetOrigTable(AValue: TComponent);
+    function GetOrigTable : TComponent;
     procedure SetUseIntegrity(AValue: Boolean);
     property ManagedFieldDefs : TFieldDefs read GetManagedFieldDefs;
     property ManagedIndexDefs : TIndexDefs read GetManagedIndexDefs;
