@@ -128,6 +128,7 @@ type
     function GetSortLocal: Boolean;
     procedure SetFields(const AValue: string);
     function GetFilter: string;
+    function GetIntFilter: string;
     procedure SetFilter(const AValue: string);
     procedure SetBaseFilter(const AValue: string);
     function GetSQL: string;
@@ -971,6 +972,12 @@ function TZeosDBDataSet.GetFilter: string;
 begin
   Result := FFilter;
 end;
+
+function TZeosDBDataSet.GetIntFilter: string;
+begin
+  Result := FIntFilter;
+end;
+
 function TZeosDBDataSet.GetBaseFilter: string;
 begin
   Result := FBaseFilter;

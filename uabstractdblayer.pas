@@ -572,7 +572,7 @@ begin
         Result += QuoteField((DataSet as IBaseManageDB).TableName)+'.'+'* '
       else
         Result += (DataSet as IBaseDbFilter).Fields+' ';
-      aFilter := '';//FIntFilter;
+      aFilter := (DataSet as IBaseDbFilter).GetIntFilter;
       if ((DataSet as IBaseDbFilter).BaseFilter <> '') and (aFilter <> '') then
         aFilter := '('+(DataSet as IBaseDbFilter).BaseFilter+') and ('+aFilter+')'
       else if ((DataSet as IBaseDbFilter).BaseFilter <> '') then

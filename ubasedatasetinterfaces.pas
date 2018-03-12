@@ -48,6 +48,7 @@ type
     procedure SetParameterValue(const Name: string; AValue: Variant);
     procedure SetSQL(const AValue: string);
     function GetFilter: string;
+    function GetIntFilter: string;
     procedure SetFilter(const AValue: string);
     function GetBaseFilter: string;
     procedure SetBaseFilter(const AValue: string);
