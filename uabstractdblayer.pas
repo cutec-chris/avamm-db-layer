@@ -61,7 +61,6 @@ type
     function GetLimitSTMT: string;virtual;
     function GetDataSetClass : TDatasetClass;virtual;
     function GetConnectionClass : TComponentClass;virtual;
-    property UsersFilter : string read FUsersFilter;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -110,11 +109,13 @@ type
     function DecodeFilter(aSQL : string;Parameters : TStringList;var NewSQL : string) : Boolean;virtual;
     function CheckForInjection(aFilter : string) : Boolean;
     function GetUSerCode : string;virtual;
+    procedure DestroyDataSet(DataSet : TDataSet);virtual;
 
     property LastStatement : string read FLastStmt write FLastStmt;
     property LastTime : Int64 read FLastTime write FLastTime;
     property CriticalSection : TCriticalSection read FCS;
     property IgnoreOpenRequests : Boolean read FIgnoreOpenrequests write FIgnoreOpenrequests;
+    property UsersFilter : string read FUsersFilter write FUsersFilter;
     property OnConnectionLost : TNotifyEvent read FConnectionLost write FConnectionLost;
     property OnConnect : TNotifyEvent read FConnect write FConnect;
     property OnDisconnectKeepAlive : TNotifyEvent read FKeepAlive write FKeepAlive;
@@ -229,6 +230,7 @@ begin
   FTriggers := TStringList.Create;
   FCheckedTables := TStringList.Create;
   FCS := TCriticalSection.Create;
+  FIgnoreOpenrequests := False;
 end;
 
 destructor TAbstractDBModule.Destroy;
@@ -573,7 +575,7 @@ begin
         aFilter := '('+(DataSet as IBaseDbFilter).BaseFilter+')';
       if Assigned((DataSet as IBaseManageDB).DataSource) then
         begin
-          with Self as IBaseManageDb do
+          with DataSet as IBaseManageDb do
             begin
               if ManagedFieldDefs.IndexOf('AUTO_ID') > -1 then
                 aRefField := 'AUTO_ID'
@@ -820,6 +822,10 @@ end;
 function TAbstractDBModule.GetUSerCode: string;
 begin
   Result := '';
+end;
+
+procedure TAbstractDBModule.DestroyDataSet(DataSet: TDataSet);
+begin
 end;
 
 

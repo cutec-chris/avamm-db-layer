@@ -459,7 +459,7 @@ begin
             if (copy(Protocol,0,6) = 'sqlite') then
               Statement := DbcConnection.CreateStatement //we have global locking in sqlite so we must use the actual connection
             else
-              Statement := TZConnection(TAbstractDBModule(Owner).MainConnection).DbcConnection.CreateStatement;
+              Statement := TZConnection(MainConnection).DbcConnection.CreateStatement;
             if AutoInc then
               begin
                 if (copy(Protocol,0,5) = 'mysql') then
@@ -702,8 +702,10 @@ begin
   if (not Assigned(Connection)) or (not Connection.Connected) then exit;
   if Connection.Protocol='mysql' then
     Properties.Values['ValidateUpdateCount'] := 'False';
+  {$if FPC_FULLVERSION>30000}
   if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
-    TAbstractDBModule(ForigTable.DataModule).LastTime := GetTickCount;
+    TAbstractDBModule(ForigTable.DataModule).LastTime := GetTickCount64;
+  {$endif}
   if TAbstractDBModule(Owner).IgnoreOpenRequests then exit;
   if FFirstOpen then
     begin
