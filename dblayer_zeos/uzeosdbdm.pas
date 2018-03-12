@@ -31,6 +31,7 @@ type
   { TZeosConnection }
 
   TZeosConnection = class(TZConnection,IBaseDBConnection)
+    procedure MonitorLogTrace(Sender: TObject; Event: TZLoggingEvent);
   private
     FProperties: String;
     FEData: Boolean;
@@ -196,7 +197,10 @@ implementation
 uses ZDbcIntfs,uEncrypt,ZDbcSqLite;
 resourcestring
   strUnknownDbType                = 'Unbekannter Datenbanktyp';
-  strDatabaseConnectionLost       = 'Die Datenbankverbindung wurde verlohren !';
+  strDatabaseConnectionLost       = 'Die Datenbankverbindung wurde verloren !';
+
+var
+  Monitor : TZSQLMonitor;
 
 { TZeosConnection }
 
@@ -350,6 +354,10 @@ begin
 end;
 function TZeosConnection.DoInitializeConnection: Boolean;
 begin
+  if not Assigned(Monitor) then
+    Monitor := TZSQLMonitor.Create(Owner);
+  Monitor.OnLogTrace:=@MonitorLogTrace;
+  Monitor.Active:=True;
   Result := True;
   FLimitAfterSelect := False;
   FLimitSTMT := 'LIMIT %s';
@@ -383,6 +391,14 @@ begin
       FLimitSTMT := 'TOP %s';
     end;
 end;
+
+procedure TZeosConnection.MonitorLogTrace(Sender: TObject; Event: TZLoggingEvent
+  );
+begin
+  if Assigned(TAbstractDBModule(Owner).OnLog) then
+    TAbstractDBModule(Owner).OnLog(Owner,Event.AsString);
+end;
+
 function TZeosConnection.DoExecuteDirect(aSQL: string): Integer;
 begin
   ExecuteDirect(aSQL);
@@ -1382,6 +1398,7 @@ end;
 initialization
   ConnectionClass:=TZeosConnection;
   QueryClass:=TZeosDBDataSet;
+  Monitor := nil;
 end.
 
 

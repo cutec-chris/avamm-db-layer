@@ -36,6 +36,8 @@ type
     property SQL : string read GetSQL write SetSQL;
   end;//IBaseDBFilter,IBaseManageDB,IBaseSubDatasets,IBaseModifiedDS
 
+  TAbstractDBLogEvent = procedure(Sender : TComponent;Log : string) of Object;
+
   { TAbstractDBModule }
 
   TAbstractDBModule = class(TComponent)
@@ -48,6 +50,7 @@ type
     FKeepAlive: TNotifyEvent;
     FLastStmt: string;
     FLastTime: Int64;
+    FLog: TAbstractDBLogEvent;
     FTables: TStrings;
     FTriggers: TStrings;
     FProperties: String;
@@ -116,6 +119,7 @@ type
     property CriticalSection : TCriticalSection read FCS;
     property IgnoreOpenRequests : Boolean read FIgnoreOpenrequests write FIgnoreOpenrequests;
     property UsersFilter : string read FUsersFilter write FUsersFilter;
+    property OnLog : TAbstractDBLogEvent read FLog write FLog;
     property OnConnectionLost : TNotifyEvent read FConnectionLost write FConnectionLost;
     property OnConnect : TNotifyEvent read FConnect write FConnect;
     property OnDisconnectKeepAlive : TNotifyEvent read FKeepAlive write FKeepAlive;
