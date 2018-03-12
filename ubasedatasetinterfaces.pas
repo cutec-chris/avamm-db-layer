@@ -425,15 +425,15 @@ begin
           if (DataSet as IBaseManageDB).GetUpStdFields then
             begin
               if (DataSet as IBaseManageDB).ManagedFieldDefs.IndexOf('AUTO_ID') = -1 then
-                aSQL += TAbstractDBModule(Self.Owner).FieldToSQL('SQL_ID',ftLargeInt,0,True)+' PRIMARY KEY,'+lineending
+                aSQL += FieldToSQL('SQL_ID',ftLargeInt,0,True)+' PRIMARY KEY,'+lineending
               else
                 begin
-                  aSQL += TAbstractDBModule(Self.Owner).FieldToSQL('AUTO_ID',ftLargeInt,0,True)+' PRIMARY KEY,'+lineending;
+                  aSQL += FieldToSQL('AUTO_ID',ftLargeInt,0,True)+' PRIMARY KEY,'+lineending;
                 end;
             end;
           if Assigned((DataSet as IBaseManageDB).MasterSource) and ((DataSet as IBaseManageDB).ManagedFieldDefs.IndexOf('REF_ID')=-1) then
             begin
-              aSQL += TAbstractDBModule(Self.Owner).FieldToSQL('REF_ID',ftLargeInt,0,True);
+              aSQL += FieldToSQL('REF_ID',ftLargeInt,0,True);
               if FUseIntegrity
               and (pos('.',NewTableName)=-1) //Wenn eigene Tabelle in externer Datenbank, keine Ref. Intigrität
               and (pos('.',GetFullTableName(((DataSet as IBaseManageDB).MasterSource.DataSet as IBaseManageDB).GetTableName))=-1) then //Wenn übergeordnete Tabelle in externer Datenbank, keine Ref. Intigrität
@@ -445,21 +445,21 @@ begin
                       else
                         aSQL += ' REFERENCES '+QuoteField((MasterSource.DataSet as IBaseManageDB).GetTableName)+'('+QuoteField('AUTO_ID')+') ON DELETE CASCADE';
                     end;
-                  if (TAbstractDBModule(Self.Owner).GetDBType = 'sqlite') then
+                  if (GetDBType = 'sqlite') then
                     aSQL += ' DEFERRABLE INITIALLY DEFERRED';
                 end;
               aSQL+=','+lineending;
             end;
           for i := 0 to (DataSet as IBaseManageDB).ManagedFieldDefs.Count-1 do
             if (DataSet as IBaseManageDB).ManagedFieldDefs[i].Name <> 'AUTO_ID' then
-              aSQL += TAbstractDBModule(Self.Owner).FieldToSQL((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name,(DataSet as IBaseManageDB).ManagedFieldDefs[i].DataType,(DataSet as IBaseManageDB).ManagedFieldDefs[i].Size,(DataSet as IBaseManageDB).ManagedFieldDefs[i].Required)+','+lineending;
+              aSQL += FieldToSQL((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name,(DataSet as IBaseManageDB).ManagedFieldDefs[i].DataType,(DataSet as IBaseManageDB).ManagedFieldDefs[i].Size,(DataSet as IBaseManageDB).ManagedFieldDefs[i].Required)+','+lineending;
           if (DataSet as IBaseManageDB).GetUpStdFields then
-            aSQL += TAbstractDBModule(Self.Owner).FieldToSQL('TIMESTAMPD',ftDateTime,0,True)+');'
+            aSQL += FieldToSQL('TIMESTAMPD',ftDateTime,0,True)+');'
           else
             aSql := copy(aSQL,0,length(aSQL)-2)+');';
           //with BaseApplication as IBaseApplication do
           //  Debug(aSQL);
-          TAbstractDBModule(Self.Owner).ExecuteDirect(aSQL,Connection);
+          ExecuteDirect(aSQL,Connection);
           //TODO:reconnect to DB and reopen all tables that WAS open
           //TZConnection(bConnection).Disconnect;
           //TZConnection(bConnection).Connect;
@@ -501,7 +501,7 @@ begin
           end;
 {      if not Result then
         begin
-          TAbstractDBModule(Self.Owner).UpdateTableVersion(Self.FDefaultTableName);
+          UpdateTableVersion(Self.FDefaultTableName);
         end;}
     end;
 end;

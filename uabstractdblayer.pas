@@ -678,9 +678,7 @@ end;
 function TAbstractDBModule.FieldToSQL(aName: string; aType: TFieldType;
   aSize: Integer; aRequired: Boolean): string;
 begin
-  if aName <> '' then
-    Result := QuoteField(aName)
-  else Result:='';
+  Result := Self.QuoteField(aName);
   case aType of
   ftString:
     begin
