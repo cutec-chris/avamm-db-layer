@@ -401,8 +401,9 @@ procedure TZeosConnection.MonitorLogTrace(Sender: TObject; Event: TZLoggingEvent
   );
 begin
   try
-    if Assigned(Owner) and Assigned(TAbstractDBModule(Owner).OnLog) then
-      TAbstractDBModule(Owner).OnLog(Owner,Event.AsString);
+    if pos('--sql-debug',lowercase(cmdline))>0 then
+      if Assigned(Owner) and Assigned(TAbstractDBModule(Owner).OnLog) then
+        TAbstractDBModule(Owner).OnLog(Owner,Event.AsString);
   except
   end;
 end;
