@@ -114,6 +114,13 @@ type
     function GetUSerCode : string;virtual;
     procedure DestroyDataSet(DataSet : TDataSet);virtual;
 
+    function BlobFieldToFile(DataSet : TDataSet;Fieldname : string;Filename : string;aSize : Integer = -1) : Boolean;virtual;
+    procedure FileToBlobField(Filename : string;DataSet : TDataSet;Fieldname : string);virtual;
+    procedure StreamToBlobField(Stream : TStream;aDataSet : TDataSet;Fieldname : string;Tablename : string = '');virtual;
+    function BlobFieldToStream(aDataSet: TDataSet; Fieldname: string;
+      dStream: TStream;aSize : Integer = -1) : Boolean; virtual;
+    function BlobFieldStream(DataSet: TDataSet; Fieldname: string;Tablename : string = '') : TStream; virtual;
+
     property LastStatement : string read FLastStmt write FLastStmt;
     property LastTime : Int64 read FLastTime write FLastTime;
     property CriticalSection : TCriticalSection read FCS;
@@ -131,6 +138,11 @@ var
 resourcestring
   strSQLInjection                = 'Versuchte SQL Injection !';
 implementation
+
+function UniToSys(s : string) : string;
+begin
+  Result := s;
+end;
 
 { TAbstractDBQuery }
 
@@ -828,6 +840,146 @@ end;
 
 procedure TAbstractDBModule.DestroyDataSet(DataSet: TDataSet);
 begin
+end;
+
+function TAbstractDBModule.BlobFieldToFile(DataSet: TDataSet; Fieldname: string;
+  Filename: string; aSize: Integer): Boolean;
+var
+  fstream: TFileStream;
+begin
+  fstream := TFileStream.Create(UniToSys(Filename),fmCreate);
+  try
+    Result := BlobFieldToStream(DataSet,Fieldname,fstream,aSize);
+  except
+    fStream.Free;
+    raise;
+  end;
+  fstream.Free;
+end;
+procedure TAbstractDBModule.FileToBlobField(Filename: string; DataSet: TDataSet;
+  Fieldname: string);
+var
+  fstream: TFileStream;
+begin
+  fstream := TFileStream.Create(UniToSys(Filename),fmOpenRead);
+  try
+    StreamToBlobField(fstream,DataSet,Fieldname);
+  except
+    fstream.Free;
+    raise;
+  end;
+  fstream.Free;
+end;
+const
+  ChunkSize: Longint = 16384; { copy in 8K chunks }
+procedure TAbstractDBModule.StreamToBlobField(Stream: TStream; aDataSet: TDataSet;
+  Fieldname: string; Tablename: string);
+var
+  Edited: Boolean;
+  dStream: TStream;
+  pBuf    : Pointer;
+  cnt: LongInt;
+  totCnt: LongInt=0;
+  DataSet: TDataSet;
+begin
+  Edited := False;
+  DataSet := aDataSet;
+  if DataSet.FieldDefs.IndexOf(Fieldname)=-1 then
+    begin
+      DataSet := GetNewDataSet('select '+QuoteField('SQL_ID')+','+QuoteField(Fieldname)+' from '+(aDataSet as IBaseManageDB).TableName+' where '+QuoteField('SQL_ID')+'='+QuoteValue(aDataSet.FieldByName('SQL_ID').AsString));
+      DataSet.Open;
+    end;
+  if (DataSet.State <> dsEdit) and (DataSet.State <> dsInsert) then
+    begin
+      DataSet.Edit;
+      Edited := True;
+    end;
+  dStream := DataSet.CreateBlobStream(DataSet.FieldByName(Fieldname),bmWrite);
+  try
+    GetMem(pBuf, ChunkSize);
+    try
+      cnt := Stream.Read(pBuf^, ChunkSize);
+      cnt := dStream.Write(pBuf^, cnt);
+      totCnt := totCnt + cnt;
+      {Loop the process of reading and writing}
+      while (cnt > 0) do
+        begin
+          {Read bufSize bytes from source into the buffer}
+          cnt := Stream.Read(pBuf^, ChunkSize);
+          {Now write those bytes into destination}
+          cnt := dStream.Write(pBuf^, cnt);
+          {Increment totCnt for progress and do arithmetic to update the gauge}
+          totcnt := totcnt + cnt;
+        end;
+    finally
+      FreeMem(pBuf, ChunkSize);
+    end;
+  finally
+    dStream.Free;
+  end;
+  if Edited then
+    DataSet.Post;
+  if DataSet<>aDataSet then
+    DataSet.free;
+end;
+function TAbstractDBModule.BlobFieldToStream(aDataSet: TDataSet; Fieldname: string;
+  dStream: TStream; aSize: Integer): Boolean;
+var
+  pBuf    : Pointer;
+  cnt: LongInt;
+  totCnt: LongInt=0;
+  Stream: TStream;
+  DataSet: TDataSet;
+begin
+  Result := False;
+  DataSet := aDataSet;
+  if DataSet.FieldDefs.IndexOf(Fieldname)=-1 then
+    begin
+      DataSet := GetNewDataSet('select '+QuoteField('SQL_ID')+','+QuoteField(Fieldname)+' from '+(aDataSet as IBaseManageDB).TableName+' where '+QuoteField('SQL_ID')+'='+QuoteValue(aDataSet.FieldByName('SQL_ID').AsString));
+      DataSet.Open;
+    end;
+  Stream := BlobFieldStream(DataSet,Fieldname);
+  if not Assigned(Stream) then exit;
+  try
+    try
+    GetMem(pBuf, ChunkSize);
+    try
+      cnt := Stream.Read(pBuf^, ChunkSize);
+      cnt := dStream.Write(pBuf^, cnt);
+      totCnt := totCnt + cnt;
+      {Loop the process of reading and writing}
+      while (cnt > 0) do
+        begin
+          {Read bufSize bytes from source into the buffer}
+          cnt := Stream.Read(pBuf^, ChunkSize);
+          {Now write those bytes into destination}
+          cnt := dStream.Write(pBuf^, cnt);
+          {Increment totCnt for progress and do arithmetic to update the gauge}
+          totcnt := totcnt + cnt;
+          if aSize>-1 then
+            if totCnt>aSize then break;
+        end;
+    finally
+      FreeMem(pBuf, ChunkSize);
+    end;
+      Result := True;
+    except
+      begin
+        Result := false;
+        raise;
+      end;
+    end;
+  finally
+    Stream.Free;
+  end;
+  if DataSet<>aDataSet then
+    DataSet.free;
+end;
+
+function TAbstractDBModule.BlobFieldStream(DataSet: TDataSet; Fieldname: string;
+  Tablename: string): TStream;
+begin
+  Result := DataSet.CreateBlobStream(DataSet.FieldByName(Fieldname),bmRead);
 end;
 
 
