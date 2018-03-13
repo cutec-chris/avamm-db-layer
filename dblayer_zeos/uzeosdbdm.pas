@@ -38,6 +38,7 @@ type
     FDatabaseDir: String;
     FLimitAfterSelect: Boolean;
     FLimitSTMT: String;
+    FInTransaction : Boolean;
     FDBTyp: String;
     function DoExecuteDirect(aSQL: string): Integer;
     function DoGetTableNames(aTables: TStrings): Boolean;
@@ -50,6 +51,7 @@ type
     function DoStartTransaction(ForceTransaction : Boolean = False): Boolean;
     function DoCommitTransaction: Boolean;
     function DoRollbackTransaction: Boolean;
+    function IsTransactionActive: Boolean;
     procedure DoDisconnect;
     procedure DoConnect;
     function GetHandle : Pointer;
@@ -361,6 +363,7 @@ begin
   Monitor.Active:=True;
   Result := True;
   FLimitAfterSelect := False;
+  FDBTyp:=Protocol;
   FLimitSTMT := 'LIMIT %s';
   if Protocol = 'sqlite-3' then
     begin
@@ -373,6 +376,7 @@ begin
       ExecuteDirect('PRAGMA case_sensitive_like = ON;');
       //ExecuteDirect('PRAGMA secure_delete = ON;');
       //ExecuteDirect('PRAGMA incremental_vacuum(50);');
+      FDBTyp := 'sqlite';
     end
   else if (copy(Protocol,0,8) = 'firebird')
        or (copy(Protocol,0,9) = 'interbase') then
@@ -396,8 +400,11 @@ end;
 procedure TZeosConnection.MonitorLogTrace(Sender: TObject; Event: TZLoggingEvent
   );
 begin
-  if Assigned(TAbstractDBModule(Owner).OnLog) then
-    TAbstractDBModule(Owner).OnLog(Owner,Event.AsString);
+  try
+    if Assigned(Owner) and Assigned(TAbstractDBModule(Owner).OnLog) then
+      TAbstractDBModule(Owner).OnLog(Owner,Event.AsString);
+  except
+  end;
 end;
 
 function TZeosConnection.DoExecuteDirect(aSQL: string): Integer;
@@ -414,6 +421,7 @@ begin
   else if (copy(Protocol,0,5) = 'mssql') then
     TransactIsolationLevel:=tiReadUnCommitted;
   StartTransaction;
+  FInTransaction:=True;
 end;
 function TZeosConnection.DoCommitTransaction: Boolean;
 begin
@@ -421,14 +429,22 @@ begin
     Commit;
   if TZTransactIsolationLevel(Tag) <> TransactIsolationLevel then
     TransactIsolationLevel := TZTransactIsolationLevel(Tag);
+  FInTransaction:=False;
 end;
 function TZeosConnection.DoRollbackTransaction: Boolean;
 begin
   if not AutoCommit then
     Rollback;
   if TZTransactIsolationLevel(Tag) <> TransactIsolationLevel then
-   TransactIsolationLevel := TZTransactIsolationLevel(Tag);
+    TransactIsolationLevel := TZTransactIsolationLevel(Tag);
+  FInTransaction:=False;
 end;
+
+function TZeosConnection.IsTransactionActive: Boolean;
+begin
+  result := FInTransaction;
+end;
+
 procedure TZeosConnection.DoDisconnect;
 begin
   try
@@ -438,6 +454,7 @@ begin
 end;
 procedure TZeosConnection.DoConnect;
 begin
+  FInTransaction:=False;
   try
     Connect;
   except on e : Exception do
@@ -578,7 +595,9 @@ end;
 
 function TZeosConnection.DoGetDBLayerType: string;
 begin
-  Result := Protocol;
+  if FDBTyp = '' then
+    Result := Protocol
+  else Result := FDBTyp;
 end;
 
 function TZeosConnection.GetSyncOffset: Integer;

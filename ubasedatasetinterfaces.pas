@@ -158,6 +158,7 @@ type
     function DoStartTransaction(ForceTransaction : Boolean = False): Boolean;
     function DoCommitTransaction: Boolean;
     function DoRollbackTransaction: Boolean;
+    function IsTransactionActive: Boolean;
     procedure DoDisconnect;
     procedure DoConnect;
     function DoGetTableNames(aTables : TStrings) : Boolean;

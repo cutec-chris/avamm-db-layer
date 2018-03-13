@@ -332,7 +332,7 @@ end;
 function TAbstractDBModule.IsTransactionActive(aConnection: TComponent
   ): Boolean;
 begin
-  //Result := (aConnection as IBaseDBConnection).IsTransactionActive;
+  Result := (aConnection as IBaseDBConnection).IsTransactionActive;
 end;
 
 function TAbstractDBModule.Ping(aConnection: TComponent): Boolean;
