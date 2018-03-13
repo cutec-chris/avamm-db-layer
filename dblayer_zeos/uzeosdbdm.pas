@@ -602,13 +602,48 @@ begin
 end;
 
 function TZeosConnection.GetSyncOffset: Integer;
+var
+  Statement: IZStatement;
+  ResultSet: IZResultSet;
+  bConnection: TComponent;
 begin
-
+  {
+  if Assigned(Sequence) then
+    begin
+      bConnection := MainConnection;
+      Sequence.Connection := TZConnection(bConnection);
+      Result := Sequence.GetCurrentValue shr 56;
+      Sequence.Connection := nil;
+    end
+  else}
+    begin
+      Statement := TZConnection(TAbstractDBModule(Owner).MainConnection).DbcConnection.CreateStatement;
+      ResultSet := Statement.ExecuteQuery('SELECT '+TAbstractDBModule(Owner).QuoteField('ID')+' FROM '+TAbstractDBModule(Owner).QuoteField('GEN_SQL_ID'));
+      if ResultSet.Next then
+        Result := ResultSet.GetLong(1) shr 56
+      else Result := 0;
+      ResultSet.Close;
+      Statement.Close;
+    end;
 end;
 
 procedure TZeosConnection.SetSyncOffset(const AValue: Integer);
+var
+  Statement: IZStatement;
+  aVal: Int64;
 begin
-
+  aVal := AValue;
+  aVal := aVal shl 56;
+  {if Assigned(Sequence) then
+    begin
+      raise Exception.Create('Not implemented !!!');
+    end
+  else}
+    begin
+      Statement := TZConnection(TAbstractDBModule(Owner).MainConnection).DbcConnection.CreateStatement;
+      Statement.Execute('update '+TAbstractDBModule(Owner).QuoteField('GEN_SQL_ID')+' set '+TAbstractDBModule(Owner).QuoteField('ID')+'='+IntToStr(aVal));
+      Statement.Close;
+    end;
 end;
 
 procedure TZeosDBDataSet.TDateTimeFieldGetText(Sender: TField;
