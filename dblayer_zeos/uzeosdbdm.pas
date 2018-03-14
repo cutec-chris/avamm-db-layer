@@ -334,7 +334,8 @@ begin
       end
     else if (copy(Protocol,0,6) = 'sqlite') then
       begin
-        ForceDirectories(ExtractFileDir(Database));
+        if ExtractFileDir(Database)<>'' then
+          ForceDirectories(ExtractFileDir(Database));
       end;
     try
       Connected:=True;
@@ -401,7 +402,7 @@ procedure TZeosConnection.MonitorLogTrace(Sender: TObject; Event: TZLoggingEvent
   );
 begin
   try
-    if pos('--sql-debug',lowercase(cmdline))>0 then
+    if pos('--debug-sql',lowercase(cmdline))>0 then
       if Assigned(Owner) and Assigned(TAbstractDBModule(Owner).OnLog) then
         TAbstractDBModule(Owner).OnLog(Owner,Event.AsString);
   except

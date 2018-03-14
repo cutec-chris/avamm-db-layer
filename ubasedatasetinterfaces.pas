@@ -416,6 +416,11 @@ begin
   Result := False;
   with TAbstractDBModule(DataModule) do
     begin
+      if TableExists(GetFullTableName(GetTableName)) then
+        begin
+          Result := True;
+          exit;
+        end;
       if ((DataSet as IBaseDbFilter).Fields = '') then
         begin
           if (DataSet as IBaseDbFilter).Fields = '' then

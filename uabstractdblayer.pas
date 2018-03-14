@@ -30,10 +30,13 @@ type
 
   TAbstractDBQuery = class(TDataSet)
   private
+    function GetFetchRows: Integer;
     function GetSQL: string;
+    procedure SetFetchRows(AValue: Integer);
     procedure SetSQL(AValue: string);
   public
     property SQL : string read GetSQL write SetSQL;
+    property FetchRows : Integer read GetFetchRows write SetFetchRows;
   end;//IBaseDBFilter,IBaseManageDB,IBaseSubDatasets,IBaseModifiedDS
 
   TAbstractDBLogEvent = procedure(Sender : TComponent;Log : string) of Object;
@@ -146,9 +149,19 @@ end;
 
 { TAbstractDBQuery }
 
+function TAbstractDBQuery.GetFetchRows: Integer;
+begin
+  Result := (Self as IBaseDbFilter).GetfetchRows;
+end;
+
 function TAbstractDBQuery.GetSQL: string;
 begin
   Result := (Self as IBaseDbFilter).GetSQL;
+end;
+
+procedure TAbstractDBQuery.SetFetchRows(AValue: Integer);
+begin
+  (Self as IBaseDbFilter).SetfetchRows(AValue);
 end;
 
 procedure TAbstractDBQuery.SetSQL(AValue: string);
