@@ -1121,7 +1121,6 @@ var
   i: Integer;
   aPar: TParam;
 begin
-  if TAbstractDBModule(Owner).CheckForInjection(AValue) then exit;
   if AValue=FSQL then exit;
   Close;
   Params.Clear;
