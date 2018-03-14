@@ -20,6 +20,7 @@
     <RequiredPkgs Count="2">
       <Item1>
         <PackageName Value="avammdblayer"/>
+        <DefaultFilename Value="..\avammdblayer.lpk"/>
       </Item1>
       <Item2>
         <PackageName Value="zcomponent_nogui"/>
