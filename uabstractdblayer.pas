@@ -894,6 +894,11 @@ var
 begin
   Edited := False;
   DataSet := aDataSet;
+  if DataSet.State=dsInsert then //get SQL_ID
+    begin
+      DataSet.Post;
+      DataSet.Edit;
+    end;
   if DataSet.FieldDefs.IndexOf(Fieldname)=-1 then
     begin
       DataSet := GetNewDataSet('select '+QuoteField('SQL_ID')+','+QuoteField(Fieldname)+' from '+(aDataSet as IBaseManageDB).TableName+' where '+QuoteField('SQL_ID')+'='+QuoteValue(aDataSet.FieldByName('SQL_ID').AsString));
