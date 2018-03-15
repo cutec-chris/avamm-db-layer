@@ -412,6 +412,7 @@ var
   i: Integer;
   RestartTransaction: Boolean = False;
   NewTableName: String;
+  tmpp: SizeInt;
 begin
   Result := False;
   with TAbstractDBModule(DataModule) do
@@ -437,19 +438,19 @@ begin
                   aSQL += FieldToSQL('AUTO_ID',ftLargeInt,0,True)+' PRIMARY KEY,'+lineending;
                 end;
             end;
-          if Assigned((DataSet as IBaseManageDB).MasterSource) and ((DataSet as IBaseManageDB).ManagedFieldDefs.IndexOf('REF_ID')=-1) then
+          if Assigned((DataSet as IBaseManageDB).DataSource) and ((DataSet as IBaseManageDB).ManagedFieldDefs.IndexOf('REF_ID')=-1) then
             begin
               aSQL += FieldToSQL('REF_ID',ftLargeInt,0,True);
               if FUseIntegrity
-              and (pos('.',NewTableName)=-1) //Wenn eigene Tabelle in externer Datenbank, keine Ref. Intigrität
-              and (pos('.',GetFullTableName(((DataSet as IBaseManageDB).MasterSource.DataSet as IBaseManageDB).GetTableName))=-1) then //Wenn übergeordnete Tabelle in externer Datenbank, keine Ref. Intigrität
+              and (pos('.',NewTableName)=0) //Wenn eigene Tabelle in externer Datenbank, keine Ref. Intigrität
+              and (pos('.',GetFullTableName(((DataSet as IBaseManageDB).DataSource.DataSet as IBaseManageDB).GetTableName))=0) then //Wenn übergeordnete Tabelle in externer Datenbank, keine Ref. Intigrität
                 begin
-                  with (DataSet as IBaseManageDB).MasterSource.DataSet as IBaseManageDB do
+                  with (DataSet as IBaseManageDB).DataSource.DataSet as IBaseManageDB do
                     begin
                       if ManagedFieldDefs.IndexOf('AUTO_ID') = -1 then
-                        aSQL += ' REFERENCES '+QuoteField((MasterSource.DataSet as IBaseManageDB).GetTableName)+'('+QuoteField('SQL_ID')+') ON DELETE CASCADE'
+                        aSQL += ' REFERENCES '+QuoteField(((DataSet as IBaseManageDB).DataSource.DataSet as IBaseManageDB).GetTableName)+'('+QuoteField('SQL_ID')+') ON DELETE CASCADE'
                       else
-                        aSQL += ' REFERENCES '+QuoteField((MasterSource.DataSet as IBaseManageDB).GetTableName)+'('+QuoteField('AUTO_ID')+') ON DELETE CASCADE';
+                        aSQL += ' REFERENCES '+QuoteField(((DataSet as IBaseManageDB).DataSource.DataSet as IBaseManageDB).GetTableName)+'('+QuoteField('AUTO_ID')+') ON DELETE CASCADE';
                     end;
                   if (GetDBType = 'sqlite') then
                     aSQL += ' DEFERRABLE INITIALLY DEFERRED';
