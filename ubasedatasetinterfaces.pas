@@ -471,6 +471,7 @@ begin
           //TZConnection(bConnection).Disconnect;
           //TZConnection(bConnection).Connect;
         end;
+      Tables.Clear;
     end;
   Close;
 end;

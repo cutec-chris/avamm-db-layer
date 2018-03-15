@@ -359,9 +359,11 @@ end;
 function TZeosConnection.DoInitializeConnection: Boolean;
 begin
   if not Assigned(Monitor) then
-    Monitor := TZSQLMonitor.Create(Owner);
-  Monitor.OnLogTrace:=@MonitorLogTrace;
-  Monitor.Active:=True;
+    begin
+      Monitor := TZSQLMonitor.Create(Owner);
+      Monitor.OnLogTrace:=@MonitorLogTrace;
+      Monitor.Active:=True;
+    end;
   Result := True;
   FLimitAfterSelect := False;
   FDBTyp:=Protocol;
