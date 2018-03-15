@@ -189,7 +189,6 @@ type
     FParent: TAbstractDBDataset;
     FWasOpen : Boolean;
     FSecModified: Boolean;
-    FUseIntegrity : Boolean;
     function GetActive: Boolean;
     function GetCanEdit: Boolean;
     function GetCaption: string;
@@ -290,7 +289,6 @@ begin
 //    DataModule:=Data;
     raise Exception.Create('No Datamodule Assigned !');
   FSecModified := True;
-  FUseIntegrity:=aUseIntegrity;
   FOnChanged := nil;
   if Assigned(aOwner) and (aOwner is TAbstractDBDataset) then
     FParent := TAbstractDBDataset(aOwner);
@@ -298,8 +296,6 @@ begin
     begin
       with DataModule as TAbstractDBModule do
         FDataSet := GetNewDataSet(Self,aConnection,aMasterdata);
-      with FDataSet as IBaseManageDB do
-        UseIntegrity := FUseIntegrity;
       with FDataSet as IBaseDBFilter do
         begin
           Limit := 100;
@@ -444,7 +440,7 @@ begin
           if Assigned((DataSet as IBaseManageDB).DataSource) and ((DataSet as IBaseManageDB).ManagedFieldDefs.IndexOf('REF_ID')=-1) then
             begin
               aSQL += FieldToSQL('REF_ID',ftLargeInt,0,True);
-              if FUseIntegrity
+              if (DataSet as IBaseManageDB).UseIntegrity
               and (pos('.',NewTableName)=0) //Wenn eigene Tabelle in externer Datenbank, keine Ref. Intigrität
               and (pos('.',GetFullTableName(((DataSet as IBaseManageDB).DataSource.DataSet as IBaseManageDB).GetTableName))=0) then //Wenn übergeordnete Tabelle in externer Datenbank, keine Ref. Intigrität
                 begin
