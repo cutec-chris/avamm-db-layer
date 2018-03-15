@@ -415,6 +415,7 @@ var
   aIndex: longint;
   i: Integer;
   tmp: String;
+  aQuerry: TAbstractDBQuery;
 begin
   Result := False;
   if not (MainConnection as IBaseDBConnection).IsConnected then exit;
@@ -450,12 +451,9 @@ begin
   if not Result then
     begin
       aTableName:=GetFullTableName(aTableName);
-      {
-      aQuerry := TZReadOnlyQuery.Create(Self);
-      aQuerry.Connection:=TZConnection(MainConnection);
-      aQuerry.SQL.Text := 'select count(*) from '+aTableName;
-      if (FMainConnection.Protocol = 'mssql') then
-        aQuerry.SQL.Text := '('+aQuerry.SQL.Text+')';
+      aQuerry := TAbstractDbQuery(GetNewDataSet('select count(*) from '+aTableName));
+      if (GetDBType = 'mssql') then
+        aQuerry.SQL := '('+aQuerry.SQL+')';
       try
         aQuerry.Open;
       except
@@ -468,7 +466,6 @@ begin
             Tables.Add(aTableName);
         end;
       aQuerry.Free;
-      }
     end;
 end;
 
