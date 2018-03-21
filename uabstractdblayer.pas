@@ -901,7 +901,7 @@ begin
           DataSet.Post;
           DataSet.Edit;
         end;
-      DataSet := GetNewDataSet('select '+QuoteField('SQL_ID')+','+QuoteField(Fieldname)+' from '+(aDataSet as IBaseManageDB).TableName+' where '+QuoteField('SQL_ID')+'='+QuoteValue(aDataSet.FieldByName('SQL_ID').AsString));
+      DataSet := GetNewDataSet('select '+QuoteField('SQL_ID')+','+QuoteField(Fieldname)+' from '+QuoteField(GetFullTableName((aDataSet as IBaseManageDB).TableName))+' where '+QuoteField('SQL_ID')+'='+QuoteValue(aDataSet.FieldByName('SQL_ID').AsString));
       DataSet.Open;
     end;
   if (DataSet.State <> dsEdit) and (DataSet.State <> dsInsert) then
