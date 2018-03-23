@@ -397,7 +397,13 @@ begin
     begin
       FLimitAfterSelect := True;
       FLimitSTMT := 'TOP %s';
+    end
+  else if (copy(Protocol,0,8) = 'postgres') then
+    begin
+      FDBTyp := 'postgres';
+
     end;
+
 end;
 
 procedure TZeosConnection.MonitorLogTrace(Sender: TObject; Event: TZLoggingEvent
