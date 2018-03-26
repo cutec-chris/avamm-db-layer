@@ -418,7 +418,6 @@ begin
     begin
       if TableExists(GetFullTableName(GetTableName)) then
         begin
-          Result := True;
           exit;
         end;
       if ((DataSet as IBaseDbFilter).Fields = '') then
