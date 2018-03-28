@@ -371,10 +371,12 @@ end;
 procedure TAbstractDBDataset.CascadicPost;
 begin
   if CanEdit then
-    Post;
-  UnChange;
-  if Assigned(FOnChanged) then
-    FOnChanged(Self);
+    begin
+      Post;
+      UnChange;
+      if Assigned(FOnChanged) then
+        FOnChanged(Self);
+    end;
 end;
 procedure TAbstractDBDataset.CascadicCancel;
 begin
