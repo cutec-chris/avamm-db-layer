@@ -299,7 +299,9 @@ begin
       with FDataSet as IBaseDBFilter do
         begin
           Limit := 100;
-          FetchRows:=20;
+          with DataModule as TAbstractDBModule do
+            if GetDBType<>'sqlite' then
+              FetchRows:=20;
         end;
     end;
 end;
@@ -321,6 +323,10 @@ procedure TAbstractDBDataset.FilterEx(aFilter: string; aLimit: Integer;
   aOrderBy: string; aSortDirection: string; aLocalSorting: Boolean;
   aGlobalFilter: Boolean; aUsePermissions: Boolean; aFilterIn: string);
 begin
+  if (aFilter = GetFilter)
+  and (aLimit = GetLimit)
+  and Active
+  then exit;
   with DataSet as IBaseDbFilter do
     begin
       UsePermissions := aUsePermissions;

@@ -892,8 +892,8 @@ end;
 procedure TZeosDBDataSet.InternalRefresh;
 begin
   if TAbstractDBModule(Owner).IgnoreOpenRequests then exit;
-  if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
-    TAbstractDBModule(ForigTable.DataModule).CriticalSection.Enter;
+//  if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
+//    TAbstractDBModule(ForigTable.DataModule).CriticalSection.Enter;
   try
   try
     inherited InternalRefresh;
@@ -911,8 +911,8 @@ begin
       end;
   end;
   finally
-    if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
-      TAbstractDBModule(ForigTable.DataModule).CriticalSection.Leave;
+//    if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
+//      TAbstractDBModule(ForigTable.DataModule).CriticalSection.Leave;
   end;
 end;
 
