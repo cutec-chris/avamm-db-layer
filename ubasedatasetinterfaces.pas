@@ -883,34 +883,36 @@ begin
       exit;
     end;
   try
-  with FDataSet as IBaseManageDB do
-    if (Assigned(DataModule)) and (TAbstractDBModule(DataModule).ShouldCheckTable(TableName,True)) then
-      begin
-        if not Self.CreateTable then
-          begin
-            with FDataSet as IBaseDbFilter do
-              begin
-                OldFields := Fields;
-                Fields := '';
-                OldLimit := Limit;
-                Limit := 1;
-              end;
-            with DataSet as IBaseManageDB do
-              FDataSet.Open;
-            if (not TAbstractDBModule(DataModule).IsTransactionActive(Connection)) and AlterTable then
-            else if (not TAbstractDBModule(DataModule).IsTransactionActive(Connection)) then
-              begin
-//                with BaseApplication as IBaseApplication do
-//                  Info('Table "'+TableName+'" altering failed ');
-              end;
-            with FDataSet as IBaseDbFilter do
-              begin
-                Fields := OldFields;
-                Limit := OldLimit;
-              end;
-          end;
-      end;
+    with FDataSet as IBaseManageDB do
+      if (Assigned(DataModule)) and (TAbstractDBModule(DataModule).ShouldCheckTable(TableName,True)) then
+        begin
+          if not Self.CreateTable then
+            begin
+              with FDataSet as IBaseDbFilter do
+                begin
+                  OldFields := Fields;
+                  Fields := '';
+                  OldLimit := Limit;
+                  Limit := 1;
+                end;
+              with DataSet as IBaseManageDB do
+                FDataSet.Open;
+              if (not TAbstractDBModule(DataModule).IsTransactionActive(Connection)) and AlterTable then
+              else if (not TAbstractDBModule(DataModule).IsTransactionActive(Connection)) then
+                begin
+  //                with BaseApplication as IBaseApplication do
+  //                  Info('Table "'+TableName+'" altering failed ');
+                end;
+              with FDataSet as IBaseDbFilter do
+                begin
+                  Fields := OldFields;
+                  Limit := OldLimit;
+                end;
+              FDataSet.Close;
+            end;
+        end;
   except
+    FDataSet.Close;
   end;
   with DataSet as IBaseManageDB do
     FDataSet.Open;

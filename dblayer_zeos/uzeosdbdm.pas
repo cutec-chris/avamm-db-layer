@@ -796,96 +796,46 @@ begin
         ParamByName('Limit').AsInteger:=FLimit;
       FFirstOpen:=False;
     end;
-  if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
-    TAbstractDBModule(ForigTable.DataModule).CriticalSection.Enter;
+  inherited InternalOpen;
   try
-      try
-        inherited InternalOpen;
-      except
-        on e : Exception do
-          begin
-            if (TAbstractDBModule(Owner).CheckedTables.IndexOf(Self.GetTableName)>-1) and TAbstractDBModule(Owner).Ping(Connection) then
-              begin
-                try
-                  if pos('exist',e.Message)>0 then
+  if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
+    begin
+      FOrigTable.SetDisplayLabels(Self);
+      if FOrigTable.UpdateFloatFields then
+        begin
+          DisableControls;
+          for a := 0 to Fields.Count -1 do
+            begin
+              if Fields[a] is TFloatField then
+                begin
+                  if Fields[a].Name = 'WEIGHT' then
                     begin
-                      TAbstractDBModule(Owner).CheckedTables.Delete(TAbstractDBModule(Owner).CheckedTables.IndexOf(Self.GetTableName));
-                      if TAbstractDBModule(Owner).Ping(Connection) then
-                        if Assigned(FOrigTable) then
-                          ForigTable.CreateTable;
-                    end;
-                  inherited InternalOpen;
-                except
-                  if TAbstractDBModule(Owner).Ping(Connection) then
+                      TFloatField(Fields[a]).DisplayFormat := '#,##0.000##';
+                      TFloatField(Fields[a]).EditFormat := '0.000##';
+                      TFloatField(Fields[a]).Precision:=5;
+                    end
                   else
                     begin
-                      WaitForLostConnection;
-                      inherited InternalOpen;
+                      TFloatField(Fields[a]).DisplayFormat := '#,##0.00##';
+                      TFloatField(Fields[a]).EditFormat := '0.00##';
+                      TFloatField(Fields[a]).Precision:=5;
                     end;
                 end;
-              end
-            else
-              begin
-                if TAbstractDBModule(Owner).Ping(Connection) then
-                  raise
-                else
-                  begin
-                    WaitForLostConnection;
-                    inherited InternalOpen;
-                  end;
-              end;
-          end;
-      end;
-      try
-      if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
-        begin
-          FOrigTable.SetDisplayLabels(Self);
-          if FOrigTable.UpdateFloatFields then
-            begin
-              DisableControls;
-              for a := 0 to Fields.Count -1 do
+              if (Fields[a] is TDateTimeField)
+              then
                 begin
-                  if Fields[a] is TFloatField then
-                    begin
-                      if Fields[a].Name = 'WEIGHT' then
-                        begin
-                          TFloatField(Fields[a]).DisplayFormat := '#,##0.000##';
-                          TFloatField(Fields[a]).EditFormat := '0.000##';
-                          TFloatField(Fields[a]).Precision:=5;
-                        end
-                      else
-                        begin
-                          TFloatField(Fields[a]).DisplayFormat := '#,##0.00##';
-                          TFloatField(Fields[a]).EditFormat := '0.00##';
-                          TFloatField(Fields[a]).Precision:=5;
-                        end;
-                    end;
-                  if (Fields[a] is TDateTimeField)
-                  then
-                    begin
-                      TDateTimeField(Fields[a]).DisplayFormat := ShortDateFormat+' '+ShortTimeFormat;
-                      TDateTimeField(Fields[a]).OnGetText:=@TDateTimeFieldGetText;
-                    end;
+                  TDateTimeField(Fields[a]).DisplayFormat := ShortDateFormat+' '+ShortTimeFormat;
+                  TDateTimeField(Fields[a]).OnGetText:=@TDateTimeFieldGetText;
                 end;
-              EnableControls;
             end;
+          EnableControls;
         end;
-      except
-        begin
-          FOrigTable:=nil;
-          raise;
-        end;
-      end;
-{      if ReadOnly then
-        with BaseApplication as IBaseApplication do
-          if Assigned(FOrigTable) then
-            begin
-              Warning(FOrigTable.TableName+' Dataset is read Only !');
-              ReadOnly:=False;
-            end;  }
-  finally
-    if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
-      TAbstractDBModule(ForigTable.DataModule).CriticalSection.Leave;
+    end;
+  except
+    begin
+      FOrigTable:=nil;
+      raise;
+    end;
   end;
 end;
 
