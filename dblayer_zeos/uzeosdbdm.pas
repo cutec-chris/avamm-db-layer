@@ -798,7 +798,10 @@ begin
     end;
   inherited InternalOpen;
   try
-  if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
+  if Assigned(FOrigTable)
+  and Assigned(ForigTable.DataModule)
+  and Assigned(Self)
+  then
     begin
       FOrigTable.SetDisplayLabels(Self);
       if FOrigTable.UpdateFloatFields then

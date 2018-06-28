@@ -562,7 +562,7 @@ begin
             aSQL += TSQLDbDBDM(Self.Owner).FieldToSQL('TIMESTAMPD',ftDateTime,0,True)+');'
           else
             aSql := copy(aSQL,0,length(aSQL)-2)+');';
-          with BaseApplication as IBaseApplication do
+          if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
             Debug(aSQL);
           TSQLConnection(bConnection).ExecuteDirect(aSQL);
           //TODO:reconnect to DB and reopen all tables that WAS open
@@ -616,7 +616,7 @@ var
   tmpSize: Integer;
 begin
   Result := True;
-  with BaseApplication as IBaseApplication do
+  if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
     Debug('AlterTable:'+FDefaultTableName);
   try
     if FFields <> '' then exit;
@@ -627,7 +627,7 @@ begin
             if (FieldDefs.IndexOf(FManagedFieldDefs[i].Name) = -1) and (FManagedFieldDefs[i].Name <> 'AUTO_ID') then
               begin
                 aSQL := 'ALTER TABLE '+GetFullTableName(FDefaultTableName)+' ADD '+TSQLDbDBDM(Self.Owner).FieldToSQL(FManagedFieldDefs[i].Name,FManagedFieldDefs[i].DataType,FManagedFieldDefs[i].Size,False)+';';
-                with BaseApplication as IBaseApplication do
+                if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
                   Debug(aSQL);
                 aConnection := TSQLConnection(DataBase);
                 try
@@ -644,19 +644,19 @@ begin
                 and (tmpSize<>255) //mssql workaround we have no field that has 255 chars size
                 then
                   begin
-                    with BaseApplication as IBaseApplication do
+                    if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
                       Debug(FManagedFieldDefs[i].Name+': ist '+IntToStr(tmpSize)+' soll '+IntToStr(FManagedFieldDefs[i].Size));
                     if (copy(TSQLDbDBDM(Self.Owner).Protocol,0,8) = 'postgres') then
                       aSQL := 'ALTER TABLE '+GetFullTableName(FDefaultTableName)+' ALTER COLUMN '+QuoteField(FManagedFieldDefs[i].Name)+' TYPE '+TSQLDbDBDM(Self.Owner).FieldToSQL('',FManagedFieldDefs[i].DataType,FManagedFieldDefs[i].Size,False)+';'
                     else if (copy(TSQLDbDBDM(Self.Owner).Protocol,0,6) = 'sqlite') then
                     else
                       aSQL := 'ALTER TABLE '+GetFullTableName(FDefaultTableName)+' ALTER COLUMN '+QuoteField(FManagedFieldDefs[i].Name)+' '+TSQLDbDBDM(Self.Owner).FieldToSQL('',FManagedFieldDefs[i].DataType,FManagedFieldDefs[i].Size,False)+';';
-                    with BaseApplication as IBaseApplication do
+                    if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
                       Debug(aSQL);
                     aConnection := TSQLConnection(DataBase);
                     if aSQL<>'' then
                       begin
-                        with BaseApplication as IBaseApplication do
+                        if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
                           Debug(aSQL);
                         try
                           TSQLConnection(aConnection).ExecuteDirect(aSQL);
@@ -681,7 +681,7 @@ begin
                     aSQL := aSQL+'INDEX '+QuoteField(Uppercase(Self.DefaultTableName+'_'+FManagedIndexDefs.Items[i].Name))+' ON '+GetFullTableName(Self.DefaultTableName)+' ('+QuoteField(StringReplace(FManagedIndexDefs.Items[i].Fields,';',QuoteField(','),[rfReplaceAll]))+');'+lineending;
                     if aSQL <> '' then
                       begin
-                        with BaseApplication as IBaseApplication do
+                        if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
                           Debug(aSQL);
                         TSQLConnection(DataBase).ExecuteDirect(aSQL);
                       end;
@@ -694,14 +694,14 @@ begin
   except
     on e : Exception do
       begin
-        with BaseApplication as IBaseApplication do
+        if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
           Error('Altering failed:'+e.Message);
         Result := False;
       end;
   end;
   if Result and Changed and (Self.FDefaultTableName<>'TABLEVERSIONS') then
     begin
-      with BaseApplication as IBaseApplication do
+      if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
         Info('Table '+Self.FDefaultTableName+' resetting Metadata Infos...');
       try
         //TODO:DataBase.DbcConnection.GetMetadata.ClearCache;
@@ -813,7 +813,7 @@ begin
         end;
       end;
       if ReadOnly then
-        with BaseApplication as IBaseApplication do
+        if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
           if Assigned(FOrigTable) then
             begin
               Warning(FOrigTable.TableName+' Dataset is read Only !');
@@ -1784,7 +1784,7 @@ begin
         TSQLDbDBDataSet(DataSet).DataSource := nil;
       end;
   except
-    with BaseApplication as IBaseApplication do
+    if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
      Debug(Self.ClassName+' has Masterdata that is destroyed before itself !!');
   end;
 end;
@@ -2006,7 +2006,7 @@ begin
         begin
           Result := TFileStream.Create(UniToSys(aFName),fmOpenRead);
         end
-      else with BaseApplication as IBaseApplication do
+      else if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
         Debug('File '+UniToSys(aFName)+' dont exists ?!');
     end
   else Result := inherited;

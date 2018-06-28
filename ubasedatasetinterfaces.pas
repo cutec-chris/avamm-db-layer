@@ -470,7 +470,7 @@ begin
             aSQL += FieldToSQL('TIMESTAMPD',ftDateTime,0,True)+');'
           else
             aSql := copy(aSQL,0,length(aSQL)-2)+');';
-          //with BaseApplication as IBaseApplication do
+          //if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
           //  Debug(aSQL);
           ExecuteDirect(aSQL,Connection);
           //TODO:reconnect to DB and reopen all tables that WAS open
@@ -554,18 +554,18 @@ begin
                 and (tmpSize<>255) //mssql workaround we have no field that has 255 chars size
                 then
                   begin
-//                    with BaseApplication as IBaseApplication do
+//                    if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
 //                      Debug((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name+': ist '+IntToStr(tmpSize)+' soll '+IntToStr((DataSet as IBaseManageDB).ManagedFieldDefs[i].Size));
                     if (TAbstractDBModule(DataModule).GetDBType = 'postgres') then
                       aSQL := 'ALTER TABLE '+GetFullTableName((DataSet as IBaseManageDB).GetTableName)+' ALTER COLUMN '+QuoteField((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name)+' TYPE '+TAbstractDBModule(DataModule).FieldToSQL('',(DataSet as IBaseManageDB).ManagedFieldDefs[i].DataType,(DataSet as IBaseManageDB).ManagedFieldDefs[i].Size,False)+';'
                     else if (TAbstractDBModule(DataModule).GetDBType = 'sqlite') then
                     else
                       aSQL := 'ALTER TABLE '+GetFullTableName((DataSet as IBaseManageDB).GetTableName)+' ALTER COLUMN '+QuoteField((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name)+' '+TAbstractDBModule(DataModule).FieldToSQL('',(DataSet as IBaseManageDB).ManagedFieldDefs[i].DataType,(DataSet as IBaseManageDB).ManagedFieldDefs[i].Size,False)+';';
-//                    with BaseApplication as IBaseApplication do
+//                    if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
 //                      Debug(aSQL);
                     if aSQL<>'' then
                       begin
-//                        with BaseApplication as IBaseApplication do
+//                        if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
 //                          Debug(aSQL);
                         try
                           TAbstractDBModule(DataModule).ExecuteDirect(aSQL);
@@ -593,7 +593,7 @@ begin
                     aSQL := aSQL+'INDEX '+QuoteField(Uppercase((DataSet as IBaseManageDB).GetTableName+'_'+(DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Name))+' ON '+GetFullTableName((DataSet as IBaseManageDB).GetTableName)+' ('+QuoteField(StringReplace((DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Fields,';',QuoteField(','),[rfReplaceAll]))+');'+lineending;
                     if aSQL <> '' then
                       begin
-//                        with BaseApplication as IBaseApplication do
+//                        if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
 //                          Debug(aSQL);
                         TAbstractDBModule(DataModule).ExecuteDirect(aSQL);
                       end;
@@ -607,7 +607,7 @@ begin
   except
     on e : Exception do
       begin
-//        with BaseApplication as IBaseApplication do
+//        if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
 //          Error('Altering failed:'+e.Message);
         Result := False;
       end;
@@ -615,7 +615,7 @@ begin
 {
   if Result and Changed and (Self.FDefaultTableName<>'TABLEVERSIONS') then
     begin
-      with BaseApplication as IBaseApplication do
+      if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
         Info('Table '+Self.FDefaultTableName+' resetting Metadata Infos...');
       try
         Connection.DbcConnection.GetMetadata.ClearCache;
@@ -900,7 +900,7 @@ begin
               if (not TAbstractDBModule(DataModule).IsTransactionActive(Connection)) and AlterTable then
               else if (not TAbstractDBModule(DataModule).IsTransactionActive(Connection)) then
                 begin
-  //                with BaseApplication as IBaseApplication do
+  //                if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
   //                  Info('Table "'+TableName+'" altering failed ');
                 end;
               with FDataSet as IBaseDbFilter do
