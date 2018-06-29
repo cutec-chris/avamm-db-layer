@@ -266,6 +266,8 @@ destructor TAbstractDBModule.Destroy;
 begin
   IgnoreOpenRequests:=True;
   FreeAndNil(FMainConnection);
+  FTables.Free;
+  FTriggers.Free;
   inherited Destroy;
   FCheckedTables.Free;
   FCS.Destroy;
