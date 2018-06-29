@@ -210,10 +210,13 @@ type
     procedure SetIsReadOnly(AValue: Boolean);
     procedure SetSortDirection(AValue: TSortDirection);
     procedure SetSortFields(AValue: string);
+  protected
+    FFreeDataSet : Boolean;
   public
     constructor CreateExIntegrity(aOwner : TComponent;DM : TComponent;aUseIntegrity : Boolean;aConnection : TComponent = nil;aMasterdata : TDataSet = nil);virtual;
     constructor CreateEx(aOwner : TComponent;DM : TComponent;aConnection : TComponent = nil;aMasterdata : TDataSet = nil);virtual;
     constructor Create(aOwner : TComponent);override;
+    destructor Destroy; override;
     property DataSet : TDataSet read FDataSet write FDataSet;
     procedure Open;virtual;
     procedure Close;virtual;
@@ -282,6 +285,7 @@ constructor TAbstractDBDataset.CreateExIntegrity(aOwner: TComponent; DM: TCompon
   aUseIntegrity: Boolean; aConnection: TComponent; aMasterdata: TDataSet);
 begin
   inherited Create(aOwner);
+  FFreeDataSet:=Assigned(aMasterdata);
   FWasOpen:=False;
   Fparent := nil;
   DataModule := DM;
@@ -353,7 +357,15 @@ end;
 constructor TAbstractDBDataset.Create(aOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FFreeDataSet:=True;
   FUpdateFloatFields := false;
+end;
+
+destructor TAbstractDBDataset.Destroy;
+begin
+  if FFreeDataSet then
+    FreeAndNil(FDataSet);
+  inherited Destroy;
 end;
 
 procedure TAbstractDBDataset.FillDefaults(aDataSet: TDataSet);

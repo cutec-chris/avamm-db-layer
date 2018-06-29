@@ -852,6 +852,7 @@ end;
 
 procedure TAbstractDBModule.DestroyDataSet(DataSet: TDataSet);
 begin
+  DataSet.Close;
 end;
 
 function TAbstractDBModule.BlobFieldToFile(DataSet: TDataSet; Fieldname: string;

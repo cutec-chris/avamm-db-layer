@@ -1396,8 +1396,9 @@ begin
   FInBeforePost := False;
 end;
 destructor TZeosDBDataSet.Destroy;
+var
+  aItem: TObject;
 begin
-  //TODO: Free Subdatasets ??
   FParams.Free;
   FManagedFieldDefs.Free;
   FManagedIndexDefs.Free;
