@@ -542,6 +542,7 @@ var
   tmp: String;
   tmp1: String;
 begin
+  //writeln('Altering ',Self.TableName);
   Result := True;
   try
     if (DataSet as IBaseDbFilter).Fields <> '' then exit;
@@ -567,7 +568,7 @@ begin
                 then
                   begin
 //                    if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
-//                      Debug((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name+': ist '+IntToStr(tmpSize)+' soll '+IntToStr((DataSet as IBaseManageDB).ManagedFieldDefs[i].Size));
+                      //writeln((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name+': ist '+IntToStr(tmpSize)+' soll '+IntToStr((DataSet as IBaseManageDB).ManagedFieldDefs[i].Size));
                     if (TAbstractDBModule(DataModule).GetDBType = 'postgres') then
                       aSQL := 'ALTER TABLE '+GetFullTableName((DataSet as IBaseManageDB).GetTableName)+' ALTER COLUMN '+QuoteField((DataSet as IBaseManageDB).ManagedFieldDefs[i].Name)+' TYPE '+TAbstractDBModule(DataModule).FieldToSQL('',(DataSet as IBaseManageDB).ManagedFieldDefs[i].DataType,(DataSet as IBaseManageDB).ManagedFieldDefs[i].Size,False)+';'
                     else if (TAbstractDBModule(DataModule).GetDBType = 'sqlite') then
@@ -584,6 +585,8 @@ begin
                           aChanged := True;
                           Result := True;
                         except
+                          on e : Exception do
+                          //          writeln('Altering failed:'+e.Message);
                         end;
                       end;
                   end;
@@ -620,26 +623,10 @@ begin
     on e : Exception do
       begin
 //        if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
-//          Error('Altering failed:'+e.Message);
+//          writeln('Altering failed:'+e.Message);
         Result := False;
       end;
   end;
-{
-  if Result and Changed and (Self.FDefaultTableName<>'TABLEVERSIONS') then
-    begin
-      if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
-        Info('Table '+Self.FDefaultTableName+' resetting Metadata Infos...');
-      try
-        Connection.DbcConnection.GetMetadata.ClearCache;
-      except
-      end;
-    end;
-  if Changed then
-    begin
-      TBaseDBModule(Self.Owner).UpdateTableVersion(Self.FDefaultTableName);
-      Self.Unprepare;
-    end;
-}
 end;
 
 function TAbstractDBDataset.Delete: Boolean;
