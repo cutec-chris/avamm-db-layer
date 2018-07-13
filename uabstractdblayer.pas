@@ -57,7 +57,9 @@ type
     FTables: TStrings;
     FTriggers: TStrings;
     FProperties: String;
+    FDatabaseDir : string;
     FUsersFilter: string;
+    FUseExtData : Boolean;
     FMainConnection: TAbstractDBConnection;
     function GetSyncOffset: Integer;virtual;
     procedure SetSyncOffset(AValue: Integer);virtual;
@@ -260,6 +262,7 @@ begin
   FCheckedTables := TStringList.Create;
   FCS := TCriticalSection.Create;
   FIgnoreOpenrequests := False;
+  FUseExtData:=False;
 end;
 
 destructor TAbstractDBModule.Destroy;
@@ -392,6 +395,8 @@ begin
   if Connection=nil then
     Connection := MainConnection;
   Result := (Connection as IBaseDBConnection).DoSetProperties(aProp);
+  FUseExtData:=(Connection as IBaseDBConnection).UseExtData;
+  FDatabaseDir:=(Connection as IBaseDBConnection).GetDatabaseDir;
   if Result then
     begin
       (Connection as IBaseDBConnection).DoConnect;
@@ -897,19 +902,51 @@ var
   cnt: LongInt;
   totCnt: LongInt=0;
   DataSet: TDataSet;
+  aFName: String;
+  aFStream: TFileStream;
 begin
   Edited := False;
   DataSet := aDataSet;
-  if DataSet.FieldDefs.IndexOf(Fieldname)=-1 then
+  if Tablename='' then
+    TableName := (aDataSet as IBaseManageDB).TableName;
+  if (DataSet.FieldDefs.IndexOf(Fieldname)=-1) or (FUseExtData and (Tablename='DOCUMENTS')) then
     begin
       if DataSet.State=dsInsert then //get SQL_ID
         begin
           DataSet.Post;
           DataSet.Edit;
         end;
-      DataSet := GetNewDataSet('select '+QuoteField('SQL_ID')+','+QuoteField(Fieldname)+' from '+GetFullTableName((aDataSet as IBaseManageDB).TableName)+' where '+QuoteField('SQL_ID')+'='+QuoteValue(aDataSet.FieldByName('SQL_ID').AsString));
-      DataSet.Open;
+      if not ((FUseExtData and (Tablename='DOCUMENTS'))) then
+        begin
+          DataSet := GetNewDataSet('select '+QuoteField('SQL_ID')+','+QuoteField(Fieldname)+' from '+GetFullTableName((aDataSet as IBaseManageDB).TableName)+' where '+QuoteField('SQL_ID')+'='+QuoteValue(aDataSet.FieldByName('SQL_ID').AsString));
+          DataSet.Open;
+        end;
     end;
+  //Save to File
+  if (FUseExtData and (Tablename='DOCUMENTS')) then
+    begin
+      aFName := FDatabaseDir+DirectorySeparator+'edata'+DirectorySeparator;
+      aFName:=aFName+Tablename+DirectorySeparator;
+      if (DataSet.Fielddefs.IndexOf('TYPE')<>-1) then
+        if DataSet.FieldByName('TYPE').AsString<>'' then
+          aFName:=aFName+DataSet.FieldByName('TYPE').AsString+DirectorySeparator;
+      aFName:=aFName+DataSet.FieldByName('SQL_ID').AsString+'.'+Fieldname+'.dat';
+      ForceDirectories(ExtractFileDir(UniToSys(aFName)));
+      aFStream := TFileStream.Create(UniToSys(aFName),fmCreate);
+      aFStream.CopyFrom(Stream,0);
+      aFStream.Free;
+      if (DataSet.FieldDefs.IndexOf(Fieldname)>-1) and (not (DataSet.FieldByName(Fieldname).IsNull)) then
+        begin
+          Edited := DataSet.State=dsBrowse;
+          if Edited then
+            DataSet.Edit;
+          DataSet.FieldByName(Fieldname).Clear;
+          if Edited then
+            DataSet.Post;
+        end;
+      exit;
+    end;
+  //Save to Database
   if (DataSet.State <> dsEdit) and (DataSet.State <> dsInsert) then
     begin
       DataSet.Edit;
@@ -943,23 +980,42 @@ begin
   if DataSet<>aDataSet then
     DataSet.free;
 end;
-function TAbstractDBModule.BlobFieldToStream(aDataSet: TDataSet; Fieldname: string;
-  dStream: TStream; aSize: Integer): Boolean;
+function TAbstractDBModule.BlobFieldToStream(aDataSet: TDataSet;
+  Fieldname: string; dStream: TStream; aSize: Integer): Boolean;
 var
   pBuf    : Pointer;
   cnt: LongInt;
   totCnt: LongInt=0;
-  Stream: TStream;
+  Stream: TStream = nil;
   DataSet: TDataSet;
+  aFName: String;
+  TableName: String;
 begin
   Result := False;
+  TableName := (aDataSet as IBaseManageDB).TableName;
   DataSet := aDataSet;
-  if DataSet.FieldDefs.IndexOf(Fieldname)=-1 then
+  if (FUseExtData and (Tablename='DOCUMENTS')) then
     begin
-      DataSet := GetNewDataSet('select '+QuoteField('SQL_ID')+','+QuoteField(Fieldname)+' from '+GetFullTableName((aDataSet as IBaseManageDB).TableName)+' where '+QuoteField('SQL_ID')+'='+QuoteValue(aDataSet.FieldByName('SQL_ID').AsString));
-      DataSet.Open;
+      aFName := FDatabaseDir+DirectorySeparator+'edata'+DirectorySeparator;
+      aFName:=aFName+Tablename+DirectorySeparator;
+      if (aDataSet.Fielddefs.IndexOf('TYPE')<>-1) then
+        if aDataSet.FieldByName('TYPE').AsString<>'' then
+          aFName:=aFName+aDataSet.FieldByName('TYPE').AsString+DirectorySeparator;
+      aFName:=aFName+aDataSet.FieldByName('SQL_ID').AsString+'.'+Fieldname+'.dat';
+      if (FileExists(UniToSys(aFName))) then
+        begin
+          Stream := TFileStream.Create(UniToSys(aFName),fmOpenRead);
+        end;
+    end
+  else
+    begin
+      if DataSet.FieldDefs.IndexOf(Fieldname)=-1 then
+        begin
+          DataSet := GetNewDataSet('select '+QuoteField('SQL_ID')+','+QuoteField(Fieldname)+' from '+GetFullTableName((aDataSet as IBaseManageDB).TableName)+' where '+QuoteField('SQL_ID')+'='+QuoteValue(aDataSet.FieldByName('SQL_ID').AsString));
+          DataSet.Open;
+        end;
+      Stream := BlobFieldStream(DataSet,Fieldname);
     end;
-  Stream := BlobFieldStream(DataSet,Fieldname);
   if not Assigned(Stream) then exit;
   try
     try

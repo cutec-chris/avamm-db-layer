@@ -64,6 +64,8 @@ type
     function DoGetDBLayerType: string;
     function GetSyncOffset: Integer;
     procedure SetSyncOffset(const AValue: Integer);
+    function UseExtData: Boolean;
+    function GetDatabaseDir: string;
   protected
   end;
 
@@ -653,6 +655,16 @@ begin
       Statement.Execute('update '+TAbstractDBModule(Owner).QuoteField('GEN_SQL_ID')+' set '+TAbstractDBModule(Owner).QuoteField('ID')+'='+IntToStr(aVal));
       Statement.Close;
     end;
+end;
+
+function TZeosConnection.UseExtData: Boolean;
+begin
+  Result := FEData;
+end;
+
+function TZeosConnection.GetDatabaseDir: string;
+begin
+  Result := FDatabaseDir;
 end;
 
 procedure TZeosDBDataSet.TDateTimeFieldGetText(Sender: TField;

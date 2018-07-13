@@ -172,6 +172,8 @@ type
     function GetUniID(aConnection : TComponent;Generator : string;Tablename : string;AutoInc : Boolean) : Variant;
     function GetSyncOffset: Integer;
     procedure SetSyncOffset(const AValue: Integer);
+    function UseExtData : Boolean;
+    function GetDatabaseDir : string;
   end;
 
   { TAbstractDBDataset }
