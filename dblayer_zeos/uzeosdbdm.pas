@@ -1372,7 +1372,11 @@ begin
 end;
 function TZeosDBDataSet.GetCount: Integer;
 begin
-  Result := FSubDataSets.Count;
+  try
+    Result := FSubDataSets.Count;
+  except
+    Result := 0;
+  end;
 end;
 function TZeosDBDataSet.GetSubDataSetIdx(aIdx: Integer): TComponent;
 begin
