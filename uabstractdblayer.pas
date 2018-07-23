@@ -770,7 +770,7 @@ begin
     begin
       if (GetDBType = 'mssql') then
         Result := Result+' IMAGE'
-      else if (GetDBType = 'postgresql') then
+      else if (GetDBType = 'postgres') then
         Result := Result+' BYTEA'
       else if (GetDBType = 'mysql') then
         Result := Result+' LONGBLOB'
