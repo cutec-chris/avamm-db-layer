@@ -909,7 +909,7 @@ begin
   DataSet := aDataSet;
   if Tablename='' then
     TableName := (aDataSet as IBaseManageDB).TableName;
-  if (DataSet.FieldDefs.IndexOf(Fieldname)=-1) or (FUseExtData and (Tablename='DOCUMENTS')) then
+  if (DataSet.FieldDefs.IndexOf(Fieldname)=-1) then
     begin
       if DataSet.State=dsInsert then //get SQL_ID
         begin
@@ -1006,8 +1006,8 @@ begin
         begin
           Stream := TFileStream.Create(UniToSys(aFName),fmOpenRead);
         end;
-    end
-  else
+    end;
+  if not Assigned(Stream) then
     begin
       if DataSet.FieldDefs.IndexOf(Fieldname)=-1 then
         begin
