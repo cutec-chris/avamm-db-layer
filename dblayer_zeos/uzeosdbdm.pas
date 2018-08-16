@@ -463,6 +463,7 @@ begin
     Disconnect;
   except
   end;
+  FreeAndNil(Monitor);
 end;
 procedure TZeosConnection.DoConnect;
 begin
