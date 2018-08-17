@@ -292,7 +292,6 @@ begin
   Fparent := nil;
   DataModule := DM;
   if DataModule=nil then
-//    DataModule:=Data;
     raise Exception.Create('No Datamodule Assigned !');
   FSecModified := True;
   FOnChanged := nil;
