@@ -518,7 +518,7 @@ begin
   tmp := copy(tmp,pos(',',tmp)+1,length(tmp));
   while pos(',',tmp) > 0 do
     begin
-      Result := Result+ ' inner join '+QuoteField(copy(tmp,0,pos(',',tmp)-1))+' on '+QuoteField(copy(tmp,0,pos(',',tmp)-1))+'.REF_ID='+aDS+'.SQL_ID';
+      Result := Result+ ' inner join '+QuoteField(copy(tmp,0,pos(',',tmp)-1))+' on '+QuoteField(copy(tmp,0,pos(',',tmp)-1))+'.'+QuoteField('REF_ID')+'='+aDS+'.'+QuoteField('SQL_ID');
       aDS := QuoteField(copy(tmp,0,pos(',',tmp)-1));
       tmp := copy(tmp,pos(',',tmp)+1,length(tmp));
     end;
