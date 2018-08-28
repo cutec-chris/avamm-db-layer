@@ -1410,6 +1410,8 @@ destructor TZeosDBDataSet.Destroy;
 var
   aItem: TObject;
 begin
+  FManagedFieldDefs.Free;
+  FManagedIndexDefs.Free;
   FParams.Free;
   FSubDataSets.Free;
   inherited Destroy;
