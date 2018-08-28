@@ -58,6 +58,7 @@ type
     FTriggers: TStrings;
     FProperties: String;
     FDatabaseDir : string;
+    FUseParameters: Boolean;
     FUsersFilter: string;
     FUseExtData : Boolean;
     FUseParameters : Boolean;
@@ -267,6 +268,7 @@ begin
   FCS := TCriticalSection.Create;
   FIgnoreOpenrequests := False;
   FUseExtData:=False;
+  FUseParameters:=True;
 end;
 
 destructor TAbstractDBModule.Destroy;
