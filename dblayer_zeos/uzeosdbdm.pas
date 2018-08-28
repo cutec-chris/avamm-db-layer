@@ -111,7 +111,6 @@ type
     //Internal DataSet Methods that needs to be changed
     procedure InternalOpen; override;
     procedure InternalRefresh; override;
-    procedure InternalPost; override;
     procedure DoAfterInsert; override;
     procedure DoBeforePost; override;
     procedure DoBeforeInsert; override;
@@ -882,11 +881,6 @@ begin
   end;
 end;
 
-procedure TZeosDBDataSet.InternalPost;
-begin
-  inherited InternalPost;
-end;
-
 procedure TZeosDBDataSet.DoAfterInsert;
 begin
   inherited DoAfterInsert;
@@ -1417,13 +1411,8 @@ var
   aItem: TObject;
 begin
   FParams.Free;
-  FManagedFieldDefs.Free;
-  FManagedIndexDefs.Free;
   FSubDataSets.Free;
-  try
-    inherited Destroy;
-  except
-  end;
+  inherited Destroy;
 end;
 
 procedure TZeosDBDataSet.DoExecSQL;

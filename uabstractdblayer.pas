@@ -60,6 +60,7 @@ type
     FDatabaseDir : string;
     FUsersFilter: string;
     FUseExtData : Boolean;
+    FUseParameters : Boolean;
     FMainConnection: TAbstractDBConnection;
     function GetSyncOffset: Integer;virtual;
     procedure SetSyncOffset(AValue: Integer);virtual;
@@ -90,7 +91,7 @@ type
     property Tables : TStrings read FTables;
     property Triggers : TStrings read FTriggers;
     function DBExists : Boolean;
-    function GetFullTableName(aTable: string): string;virtual;
+    function GetFullTableName(aTable: string;DoLookup : Boolean = True): string;virtual;
     property LimitAfterSelect : Boolean read GetLimitAfterSelect;
     property LimitSTMT : string read GetLimitSTMT;
     function IsSQLDB : Boolean;virtual;
@@ -128,6 +129,7 @@ type
 
     property LastStatement : string read FLastStmt write FLastStmt;
     property LastTime : Int64 read FLastTime write FLastTime;
+    property ParameteriseSQL : Boolean read FUseParameters write FUseParameters;
     property CriticalSection : TCriticalSection read FCS;
     property IgnoreOpenRequests : Boolean read FIgnoreOpenrequests write FIgnoreOpenrequests;
     property UsersFilter : string read FUsersFilter write FUsersFilter;
@@ -202,7 +204,8 @@ begin
   Result := TableExists('USERS') and TableExists('GEN_SQL_ID') and TableExists('GEN_AUTO_ID');
 end;
 
-function TAbstractDBModule.GetFullTableName(aTable: string): string;
+function TAbstractDBModule.GetFullTableName(aTable: string; DoLookup: Boolean
+  ): string;
 begin
   Result := aTable;
 end;
@@ -257,6 +260,7 @@ end;
 constructor TAbstractDBModule.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FUseParameters := True;
   FTables := TStringList.Create;
   FTriggers := TStringList.Create;
   FCheckedTables := TStringList.Create;
@@ -813,25 +817,29 @@ begin
   i := 0;
   NewSQL := '';
   Parameters.Clear;
-  while pos(aQuotes,aSQL)>0 do
+  if FUseParameters then
     begin
-      NewSQL:=NewSQL+copy(aSQL,0,pos(aQuotes,aSQL)-1);
-      aSQL := copy(aSQL,pos(aQuotes,aSQL)+1,length(aSQL));
-      NewSQL:=NewSQL+':Param'+IntToStr(i);
-      aParamCont := copy(aSQL,0,pos(aQuotes,aSQL)-1);
-      aSQL := copy(aSQL,pos(aQuotes,aSQL)+1,length(aSQL));
-      if copy(aSQL,0,1)=aQuotes then
+      while pos(aQuotes,aSQL)>0 do
         begin
-          aParamCont += aQuotes+copy(aSQL,0,pos(aQuotes,aSQL)-1);
+          NewSQL:=NewSQL+copy(aSQL,0,pos(aQuotes,aSQL)-1);
           aSQL := copy(aSQL,pos(aQuotes,aSQL)+1,length(aSQL));
-          aParamCont += aQuotes+copy(aSQL,0,pos(aQuotes,aSQL)-1);
+          NewSQL:=NewSQL+':Param'+IntToStr(i);
+          aParamCont := copy(aSQL,0,pos(aQuotes,aSQL)-1);
           aSQL := copy(aSQL,pos(aQuotes,aSQL)+1,length(aSQL));
+          if copy(aSQL,0,1)=aQuotes then
+            begin
+              aParamCont += aQuotes+copy(aSQL,0,pos(aQuotes,aSQL)-1);
+              aSQL := copy(aSQL,pos(aQuotes,aSQL)+1,length(aSQL));
+              aParamCont += aQuotes+copy(aSQL,0,pos(aQuotes,aSQL)-1);
+              aSQL := copy(aSQL,pos(aQuotes,aSQL)+1,length(aSQL));
+            end;
+          Parameters.Values['Param'+IntToStr(i)]:=aParamCont;
+          NewSQL:=NewSQL;
+          inc(i);
         end;
-      Parameters.Values['Param'+IntToStr(i)]:=aParamCont;
-      NewSQL:=NewSQL;
-      inc(i);
-    end;
-  NewSQL:=NewSQL+aSQL;
+      NewSQL:=NewSQL+aSQL;
+    end
+  else NewSQL:=aSQL;
 end;
 
 function TAbstractDBModule.CheckForInjection(aFilter: string): Boolean;
