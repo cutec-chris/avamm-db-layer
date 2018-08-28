@@ -914,8 +914,7 @@ begin
   except
     FDataSet.Close;
   end;
-  with DataSet as IBaseManageDB do
-    FDataSet.Open;
+  FDataSet.Open;
   if FDataSet.Active then FWasOpen:=True;
 end;
 
