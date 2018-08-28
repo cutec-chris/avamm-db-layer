@@ -61,7 +61,6 @@ type
     FUseParameters: Boolean;
     FUsersFilter: string;
     FUseExtData : Boolean;
-    FUseParameters : Boolean;
     FMainConnection: TAbstractDBConnection;
     function GetSyncOffset: Integer;virtual;
     procedure SetSyncOffset(AValue: Integer);virtual;
