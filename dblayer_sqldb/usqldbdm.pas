@@ -468,8 +468,7 @@ end;
 function TSQLConnection.GetUniID(aConnection: TComponent; Generator: string;
   Tablename: string; AutoInc: Boolean): Variant;
 var
-  Statement: IZStatement;
-  ResultSet: IZResultSet;
+  Resultset: TSQLQuery;
   bConnection: TComponent;
   aId: Int64 = 0;
 begin
@@ -479,47 +478,45 @@ begin
       try
         while aId=Result do
           begin
-            if (copy(ConnectorType,0,6) = 'sqlite') then
-              Statement := DbcConnection.CreateStatement //we have global locking in sqlite so we must use the actual connection
-            else
-              Statement := TZConnection(MainConnection).DbcConnection.CreateStatement;
             if AutoInc then
               begin
                 if (copy(ConnectorType,0,5) = 'mysql') then
                   begin
-                    Statement.Execute('update '+QuoteField(Generator)+' set '+QuoteField('ID')+'='+QuoteField('ID')+'+1;')
+                    ExecuteDirect('update '+QuoteField(Generator)+' set '+QuoteField('ID')+'='+QuoteField('ID')+'+1;')
                   end
                 else
                   begin
                     if LimitAfterSelect then
-                      Statement.Execute('update '+QuoteField(Generator)+' set '+QuoteField('ID')+'=(select '+Format(LimitSTMT,['1'])+' '+QuoteField('ID')+' from '+QuoteField(Generator)+')+1;')
+                      ExecuteDirect('update '+QuoteField(Generator)+' set '+QuoteField('ID')+'=(select '+Format(LimitSTMT,['1'])+' '+QuoteField('ID')+' from '+QuoteField(Generator)+')+1;')
                     else
-                      Statement.Execute('update '+QuoteField(Generator)+' set '+QuoteField('ID')+'=(select '+QuoteField('ID')+' from '+QuoteField(Generator)+' '+Format(LimitSTMT,['1'])+')+1;');
+                      ExecuteDirect('update '+QuoteField(Generator)+' set '+QuoteField('ID')+'=(select '+QuoteField('ID')+' from '+QuoteField(Generator)+' '+Format(LimitSTMT,['1'])+')+1;');
                   end;
               end;
             try
-              ResultSet := Statement.ExecuteQuery('SELECT '+QuoteField('ID')+' FROM '+QuoteField(Generator));
-              if ResultSet.Next then
-                Result := ResultSet.GetLong(1)
+              ResultSet := TSQLQuery.Create(Self);
+              ResultSet.DataBase := Self;
+              ResultSet.ReadOnly:=True;
+              ResultSet.SQL.Text := 'SELECT '+QuoteField('ID')+' FROM '+QuoteField(Generator);
+              Resultset.Open;
+              if ResultSet.RecordCount>0 then
+                Result := ResultSet.FieldByName('ID').AsLargeInt
               else
                 begin
-                  Statement.Execute('insert into '+QuoteField(GENERATOR)+' ('+QuoteField('SQL_ID')+','+QuoteField('ID')+') VALUES (1,1000);');
+                  ExecuteDirect('insert into '+QuoteField(GENERATOR)+' ('+QuoteField('SQL_ID')+','+QuoteField('ID')+') VALUES (1,1000);');
                   Result := 1000;
-                  ResultSet.Close;
-                  Statement.Close;
                   break;
                 end;
               try
                 if Tablename<>'' then
                   begin
-                    ResultSet := Statement.ExecuteQuery('SELECT '+QuoteField('SQL_ID')+' FROM '+QuoteField(Tablename)+' WHERE '+QuoteField('SQL_ID')+'='+QuoteValue(Format('%d',[Int64(Result)])));
-                    if ResultSet.Next then
-                      aId := ResultSet.GetLong(1)
+                    ResultSet.SQL.Text := 'SELECT '+QuoteField('SQL_ID')+' FROM '+QuoteField(Tablename)+' WHERE '+QuoteField('SQL_ID')+'='+QuoteValue(Format('%d',[Int64(Result)]));
+                    Resultset.Open;
+                    if ResultSet.RecordCount>0 then
+                      aId := ResultSet.FieldByName('ID').AsLargeInt;
                   end;
               except
               end;
-              ResultSet.Close;
-              Statement.Close;
+              ResultSet.Free;
             except
             end;
           end;
@@ -531,42 +528,22 @@ end;
 function TSQLConnection.DoGetTableNames(aTables: TStrings): Boolean;
 begin
   Result := True;
-  GetTableNames('','',aTables);
+  GetTableNames(aTables,False);
 end;
 function TSQLConnection.DoGetTriggerNames(aTriggers: TStrings): Boolean;
 begin
-  Result := True;
-  Self.GetTriggerNames('','',aTriggers);
+  Result := False;
 end;
 
 function TSQLConnection.DoGetColumns(aTableName: string): TStrings;
-var
-  Metadata: IZDatabaseMetadata;
 begin
-  Metadata := DbcConnection.GetMetadata;
   Result := TStringList.Create;
-  with Metadata.GetColumns(Catalog,'',aTableName,'') do
-   try
-     while Next do
-       Result.Add(GetStringByName('COLUMN_NAME'));
-   finally
-     Close;
-   end;
+  GetFieldNames(aTableName,Result);
 end;
 
 function TSQLConnection.DoGetIndexes(aTableName: string): TStrings;
-var
-  Metadata: IZDatabaseMetadata;
 begin
-  Metadata := DbcConnection.GetMetadata;
-  Result := TStringList.Create;
-  with Metadata.GetIndexInfo(Catalog,'',aTableName,False,False) do
-   try
-     while Next do
-       Result.Add(GetStringByName('COLUMN_NAME'));
-   finally
-     Close;
-   end;
+  Result := nil;
 end;
 
 function TSQLConnection.IsConnected: Boolean;
@@ -591,47 +568,25 @@ end;
 
 function TSQLConnection.GetSyncOffset: Integer;
 var
-  Statement: IZStatement;
-  ResultSet: IZResultSet;
+  ResultSet: TSQLQuery;
   bConnection: TComponent;
 begin
-  {
-  if Assigned(Sequence) then
-    begin
-      bConnection := MainConnection;
-      Sequence.Connection := TZConnection(bConnection);
-      Result := Sequence.GetCurrentValue shr 56;
-      Sequence.Connection := nil;
-    end
-  else}
-    begin
-      Statement := TZConnection(TAbstractDBModule(Owner).MainConnection).DbcConnection.CreateStatement;
-      ResultSet := Statement.ExecuteQuery('SELECT '+TAbstractDBModule(Owner).QuoteField('ID')+' FROM '+TAbstractDBModule(Owner).QuoteField('GEN_SQL_ID'));
-      if ResultSet.Next then
-        Result := ResultSet.GetLong(1) shr 56
-      else Result := 0;
-      ResultSet.Close;
-      Statement.Close;
-    end;
+  ResultSet := TSQLQuery.Create(Self);
+  ResultSet.SQL.Text := 'SELECT '+TAbstractDBModule(Owner).QuoteField('ID')+' FROM '+TAbstractDBModule(Owner).QuoteField('GEN_SQL_ID');
+  ResultSet.Open;
+  if ResultSet.RecordCount>0 then
+    Result := ResultSet.FieldByName('ID').AsLargeInt shr 56
+  else Result := 0;
+  ResultSet.Free;
 end;
 
 procedure TSQLConnection.SetSyncOffset(const AValue: Integer);
 var
-  Statement: IZStatement;
-  aVal: Int64;
+  aVal: Integer;
 begin
   aVal := AValue;
   aVal := aVal shl 56;
-  {if Assigned(Sequence) then
-    begin
-      raise Exception.Create('Not implemented !!!');
-    end
-  else}
-    begin
-      Statement := TZConnection(TAbstractDBModule(Owner).MainConnection).DbcConnection.CreateStatement;
-      Statement.Execute('update '+TAbstractDBModule(Owner).QuoteField('GEN_SQL_ID')+' set '+TAbstractDBModule(Owner).QuoteField('ID')+'='+IntToStr(aVal));
-      Statement.Close;
-    end;
+  ExecuteDirect('update '+TAbstractDBModule(Owner).QuoteField('GEN_SQL_ID')+' set '+TAbstractDBModule(Owner).QuoteField('ID')+'='+IntToStr(aVal));
 end;
 
 function TSQLConnection.UseExtData: Boolean;
