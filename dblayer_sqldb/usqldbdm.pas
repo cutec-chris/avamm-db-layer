@@ -64,6 +64,9 @@ type
     function UseExtData: Boolean;
     function GetDatabaseDir: string;
   protected
+  public
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
   end;
 
   { TSQLDBDataSet }
@@ -196,7 +199,7 @@ type
     function NumRowsAffected: Integer;
   end;
 implementation
-uses uEncrypt;
+uses uEncrypt,mssqlconn, sqlite3conn, pqconnection;
 resourcestring
   strUnknownDbType                = 'Unbekannter Datenbanktyp';
   strDatabaseConnectionLost       = 'Die Datenbankverbindung wurde verloren !';
@@ -235,6 +238,12 @@ begin
         ConnectorType:='sqlite-3';
         FEData:=True;
       end;
+    if ConnectorType = 'mssql' then
+      ConnectorType := 'MSSQLServer'
+    else if copy(ConnectorType,0,8) = 'postgres' then
+      ConnectorType := 'PostgreSQL'
+    else if (copy(ConnectorType,0,6) = 'sqlite') then
+      ConnectorType := 'SQLite3';
     Assert(ConnectorType<>'',strUnknownDbType);
     tmp := copy(tmp,pos(';',tmp)+1,length(tmp));
     HostName := copy(tmp,0,pos(';',tmp)-1);
@@ -358,7 +367,7 @@ begin
   FLimitAfterSelect := False;
   FDBTyp:=ConnectorType;
   FLimitSTMT := 'LIMIT %s';
-  if ConnectorType = 'sqlite-3' then
+  if copy(ConnectorType,0,6) = 'sqlite' then
     begin
       //ExecuteDirect('PRAGMA synchronous = NORMAL;');
       ExecuteDirect('PRAGMA cache_size = 5120;');
@@ -597,6 +606,17 @@ end;
 function TSQLConnection.GetDatabaseDir: string;
 begin
   Result := FDatabaseDir;
+end;
+
+constructor TSQLConnection.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  Transaction := TSQLTransaction.Create(Self);
+end;
+
+destructor TSQLConnection.Destroy;
+begin
+  inherited Destroy;
 end;
 
 procedure TSQLDBDataSet.TDateTimeFieldGetText(Sender: TField;
