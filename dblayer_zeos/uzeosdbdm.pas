@@ -261,7 +261,7 @@ begin
     User := copy(tmp,0,pos(';',tmp)-1);
     tmp := copy(tmp,pos(';',tmp)+1,length(tmp));
     if copy(tmp,0,1) = 'x' then
-      Password := Decrypt(copy(tmp,2,length(tmp)),99998)
+      Password := Decrypt(copy(tmp,2,length(tmp)),word(99998))
     else
       Password := tmp;
     if (copy(Protocol,0,6) = 'sqlite')
@@ -526,7 +526,7 @@ begin
                 Result := ResultSet.GetLong(1)
               else
                 begin
-                  Statement.Execute('insert into '+QuoteField(GENERATOR)+' ('+QuoteField('SQL_ID')+','+QuoteField('ID')+') VALUES (1,1000);');
+                  Statement.Execute('insert into '+QuoteField(GENERATOR)+' ('+QuoteField('ID')+') VALUES (1000);');
                   Result := 1000;
                   ResultSet.Close;
                   Statement.Close;
