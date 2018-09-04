@@ -380,8 +380,8 @@ begin
       //ExecuteDirect('PRAGMA incremental_vacuum(50);');
       FDBTyp := 'sqlite';
     end
-  else if (copy(ConnectorType,0,8) = 'firebird')
-       or (copy(ConnectorType,0,9) = 'interbase') then
+  else if (copy(TAbstractDBModule(Owner).GetDBType,0,8) = 'firebird')
+       or (copy(TAbstractDBModule(Owner).GetDBType,0,9) = 'interbase') then
     begin
       FDBTyp := 'firebird';
       FLimitSTMT := 'ROWS 1 TO %s';
@@ -392,12 +392,12 @@ begin
         end;
       }
     end
-  else if ConnectorType = 'mssql' then
+  else if TAbstractDBModule(Owner).GetDBType = 'mssql' then
     begin
       FLimitAfterSelect := True;
       FLimitSTMT := 'TOP %s';
     end
-  else if (copy(ConnectorType,0,8) = 'postgres') then
+  else if (copy(TAbstractDBModule(Owner).GetDBType,0,8) = 'postgres') then
     begin
       FDBTyp := 'postgres';
 
@@ -518,6 +518,7 @@ begin
               try
                 if Tablename<>'' then
                   begin
+                    ResultSet.Close;
                     ResultSet.SQL.Text := 'SELECT '+QuoteField('SQL_ID')+' FROM '+QuoteField(Tablename)+' WHERE '+QuoteField('SQL_ID')+'='+QuoteValue(Format('%d',[Int64(Result)]));
                     Resultset.Open;
                     if ResultSet.RecordCount>0 then
@@ -573,6 +574,11 @@ begin
   if FDBTyp = '' then
     Result := ConnectorType
   else Result := FDBTyp;
+  case ConnectorType of
+  'SQLite3':Result := 'sqlite';
+  'MSSQLServer':Result := 'mssql';
+  'PostgreSQL':Result := 'postgres';
+  end;
 end;
 
 function TSQLConnection.GetSyncOffset: Integer;
@@ -634,14 +640,13 @@ procedure TSQLDBDataSet.SetNewIDIfNull;
 begin
   if (FieldDefs.IndexOf('AUTO_ID') = -1) and (FieldDefs.IndexOf('SQL_ID') > -1) and  FieldByName('SQL_ID').IsNull then
     begin
-      with Self as IBaseManageDB do
-        FieldByName('SQL_ID').AsVariant:=TAbstractDBModule(Self.Owner).GetUniID(Self,'GEN_SQL_ID',TableName);
+      FieldByName('SQL_ID').AsVariant:=TAbstractDBModule(Self.Owner).GetUniID(Self.DataBase,'GEN_SQL_ID',(Self as IBaseManageDB).TableName);
       FHasNewID:=True;
     end
   else if (FieldDefs.IndexOf('SQL_ID') = -1) and (FieldDefs.IndexOf('AUTO_ID') > -1) and FieldByName('AUTO_ID').IsNull then
     begin
       with Self as IBaseManageDB do
-        FieldByName('AUTO_ID').AsVariant:=TAbstractDBModule(Self.Owner).GetUniID(Self,'GEN_AUTO_ID',TableName);
+        FieldByName('AUTO_ID').AsVariant:=TAbstractDBModule(Self.Owner).GetUniID(Self.DataBase,'GEN_AUTO_ID',TableName);
       FHasNewID:=True;
     end;
 end;

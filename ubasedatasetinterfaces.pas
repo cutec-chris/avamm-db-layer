@@ -599,23 +599,26 @@ begin
             begin
               try
                 aIndexes := (Connection as IBaseDBConnection).DoGetIndexes((DataSet as IBaseManageDB).GetTableName);
-                tmp := (DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Name;
-                tmp1 := aIndexes.Text;
-                if (aIndexes.IndexOf(tmp)=-1) and ((DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Name <>'SQL_ID') then
+                if Assigned(aIndexes) then
                   begin
-                    aSQL := 'CREATE ';
-                    if ixUnique in (DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Options then
-                      aSQL := aSQL+'UNIQUE ';
-                    aSQL := aSQL+'INDEX '+QuoteField(Uppercase((DataSet as IBaseManageDB).GetTableName+'_'+(DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Name))+' ON '+GetFullTableName((DataSet as IBaseManageDB).GetTableName)+' ('+QuoteField(StringReplace((DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Fields,';',QuoteField(','),[rfReplaceAll]))+');'+lineending;
-                    if aSQL <> '' then
+                    tmp := (DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Name;
+                    tmp1 := aIndexes.Text;
+                    if (aIndexes.IndexOf(tmp)=-1) and ((DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Name <>'SQL_ID') then
                       begin
-//                        if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
-//                          Debug(aSQL);
-                        TAbstractDBModule(DataModule).ExecuteDirect(aSQL);
+                        aSQL := 'CREATE ';
+                        if ixUnique in (DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Options then
+                          aSQL := aSQL+'UNIQUE ';
+                        aSQL := aSQL+'INDEX '+QuoteField(Uppercase((DataSet as IBaseManageDB).GetTableName+'_'+(DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Name))+' ON '+GetFullTableName((DataSet as IBaseManageDB).GetTableName)+' ('+QuoteField(StringReplace((DataSet as IBaseManageDB).ManagedIndexDefs.Items[i].Fields,';',QuoteField(','),[rfReplaceAll]))+');'+lineending;
+                        if aSQL <> '' then
+                          begin
+    //                        if Assigned(BaseApplication) then with BaseApplication as IBaseApplication do
+    //                          Debug(aSQL);
+                            TAbstractDBModule(DataModule).ExecuteDirect(aSQL);
+                          end;
+                        Result := True;
                       end;
-                    Result := True;
+                    aIndexes.Free;
                   end;
-                aIndexes.Free;
               except
               end;
             end;
