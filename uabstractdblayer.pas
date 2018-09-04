@@ -603,7 +603,12 @@ begin
       if (DataSet as IBaseDbFilter).Distinct then
         Result := Result+'DISTINCT ';
       if LimitAfterSelect and (((DataSet as IBaseDbFilter).Limit > 0)) then
-        Result += Format(LimitSTMT,[':Limit'])+' ';
+        begin
+          if ParameteriseSQL then
+            Result += Format(LimitSTMT,[':Limit'])+' '
+          else
+            Result += Format(LimitSTMT,[IntToStr((DataSet as IBaseDbFilter).Limit)])+' '
+        end;
       if (DataSet as IBaseDbFilter).Fields = '' then
         Result += QuoteField((DataSet as IBaseManageDB).TableName)+'.'+'* '
       else
@@ -654,7 +659,12 @@ begin
             Result += ' ORDER BY '+sResult;
         end;
       if ((DataSet as IBaseDbFilter).Limit > 0) and (not LimitAfterSelect) then
-        Result += ' '+Format(LimitSTMT,[':Limit']);
+        begin
+          if ParameteriseSQL then
+            Result += ' '+Format(LimitSTMT,[':Limit'])
+          else
+            Result += ' '+Format(LimitSTMT,[IntToStr((DataSet as IBaseDbFilter).Limit)]);
+        end;
     end
   else
     Result := (DataSet as IBaseDbFilter).GetSQL;

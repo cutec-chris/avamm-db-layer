@@ -1009,6 +1009,7 @@ begin
       if (AValue<>'') or (pos('where',lowercase(SQL.Text))=0) then
         exit;
     end;
+  TAbstractDBModule(Owner).ParameteriseSQL:=False;
   TAbstractDBModule(Owner).DecodeFilter(AValue,FParams,NewSQL);
   Close;
   FFilter := AValue;
@@ -1030,8 +1031,10 @@ begin
           aPar.AsString:=FParams.ValueFromIndex[i];
         end;
     end;
+  {
   if (FLimit>0) and Assigned(Params.FindParam('Limit')) then
     ParamByName('Limit').AsInteger:=FLimit;
+  }
 end;
 procedure TSQLDBDataSet.SetBaseFilter(const AValue: string);
 begin
