@@ -12,19 +12,16 @@
     <Files Count="1">
       <Item1>
         <Filename Value="usqldbdm.pas"/>
-        <UnitName Value="usqldbdm"/>
+        <UnitName Value="uSQLDBDM"/>
       </Item1>
     </Files>
-    <RequiredPkgs Count="3">
+    <RequiredPkgs Count="2">
       <Item1>
         <PackageName Value="avammdblayer"/>
       </Item1>
       <Item2>
-        <PackageName Value="SQLDBLaz"/>
-      </Item2>
-      <Item3>
         <PackageName Value="FCL"/>
-      </Item3>
+      </Item2>
     </RequiredPkgs>
     <UsageOptions>
       <UnitPath Value="$(PkgOutDir)"/>

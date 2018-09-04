@@ -615,47 +615,46 @@ begin
   if (FieldDefs.IndexOf('AUTO_ID') = -1) and (FieldDefs.IndexOf('SQL_ID') > -1) and  FieldByName('SQL_ID').IsNull then
     begin
       with Self as IBaseManageDB do
-        FieldByName('SQL_ID').AsVariant:=TAbstractDBModule(Self.Owner).GetUniID(Connection,'GEN_SQL_ID',TableName);
+        FieldByName('SQL_ID').AsVariant:=TAbstractDBModule(Self.Owner).GetUniID(Self,'GEN_SQL_ID',TableName);
       FHasNewID:=True;
     end
   else if (FieldDefs.IndexOf('SQL_ID') = -1) and (FieldDefs.IndexOf('AUTO_ID') > -1) and FieldByName('AUTO_ID').IsNull then
     begin
       with Self as IBaseManageDB do
-        FieldByName('AUTO_ID').AsVariant:=TAbstractDBModule(Self.Owner).GetUniID(Connection,'GEN_AUTO_ID',TableName);
+        FieldByName('AUTO_ID').AsVariant:=TAbstractDBModule(Self.Owner).GetUniID(Self,'GEN_AUTO_ID',TableName);
       FHasNewID:=True;
     end;
 end;
 
 function TSQLDBDataSet.IndexExists(aIndexName: string): Boolean;
 var
-  Metadata: TZSQLMetadata;
-  CustomQuery: TZQuery;
+  CustomQuery: TSQLQuery;
 begin
-  CustomQuery := TZQuery.Create(Self);
-  CustomQuery.Connection := Connection;
-  if (copy(TZConnection(TAbstractDBModule(Owner).MainConnection).ConnectorType,0,8) = 'firebird')
-  or (copy(TZConnection(TAbstractDBModule(Owner).MainConnection).ConnectorType,0,9) = 'interbase') then
+  CustomQuery := TSQLQuery.Create(Self);
+  CustomQuery.DataBase := DataBase;
+  if (copy(TSQLConnector(TAbstractDBModule(Owner).MainConnection).ConnectorType,0,8) = 'firebird')
+  or (copy(TSQLConnector(TAbstractDBModule(Owner).MainConnection).ConnectorType,0,9) = 'interbase') then
     begin
       CustomQuery.SQL.Text := 'select rdb$index_name from rdb$indices where rdb$index_name='+TAbstractDBModule(Owner).QuoteValue(indexname);
       CustomQuery.Open;
       Result := CustomQuery.RecordCount > 0;
       CustomQuery.Close;
     end
-  else if (copy(TZConnection(TAbstractDBModule(Owner).MainConnection).ConnectorType,0,6) = 'sqlite') then
+  else if (copy(TSQLConnector(TAbstractDBModule(Owner).MainConnection).ConnectorType,0,6) = 'sqlite') then
     begin
       CustomQuery.SQL.Text := 'select name from SQLITE_MASTER where "TYPE"=''index'' and NAME='+TAbstractDBModule(Owner).QuoteValue(indexname);
       CustomQuery.Open;
       Result := CustomQuery.RecordCount > 0;
       CustomQuery.Close;
     end
-  else if (copy(TZConnection(TAbstractDBModule(Owner).MainConnection).ConnectorType,0,5) = 'mssql') then
+  else if (copy(TSQLConnector(TAbstractDBModule(Owner).MainConnection).ConnectorType,0,5) = 'mssql') then
     begin
       CustomQuery.SQL.Text := 'select name from dbo.sysindexes where NAME='+TAbstractDBModule(Owner).QuoteValue(indexname);
       CustomQuery.Open;
       Result := CustomQuery.RecordCount > 0;
       CustomQuery.Close;
     end
-  else if (copy(TZConnection(TAbstractDBModule(Owner).MainConnection).ConnectorType,0,8) = 'postgres') then
+  else if (copy(TSQLConnector(TAbstractDBModule(Owner).MainConnection).ConnectorType,0,8) = 'postgres') then
     begin
       CustomQuery.SQL.Text := 'select * from pg_class where relname='+TAbstractDBModule(Owner).QuoteValue(indexname);
       CustomQuery.Open;
@@ -664,6 +663,7 @@ begin
     end
   else
     begin
+      {
       Metadata := TZSQLMetaData.Create(TZConnection(TAbstractDBModule(Owner).MainConnection));
       MetaData.Connection := Connection;
       MetaData.MetadataType:=mdIndexInfo;
@@ -674,6 +674,7 @@ begin
       MetaData.Active:=True;
       Result := MetaData.RecordCount > 0;
       MetaData.Free;
+      }
     end;
   CustomQuery.Free;
 end;
@@ -682,7 +683,7 @@ procedure TSQLDBDataSet.WaitForLostConnection;
 var
   aConnThere: Boolean;
 begin
-  if not TAbstractDBModule(Owner).Ping(Connection) then
+  if not TAbstractDBModule(Owner).Ping(DataBase) then
     begin
       if Assigned(TAbstractDBModule(Owner).OnConnectionLost) then
         TAbstractDBModule(Owner).OnConnectionLost(TAbstractDBModule(Owner));
@@ -695,7 +696,7 @@ begin
                 TAbstractDBModule(Owner).OnDisconnectKeepAlive(TAbstractDBModule(Owner));
             end;
           try
-            if TAbstractDBModule(Owner).Ping(Connection) then
+            if TAbstractDBModule(Owner).Ping(DataBase) then
               aConnThere := True;
             sleep(2000);
           except
@@ -724,9 +725,9 @@ procedure TSQLDBDataSet.InternalOpen;
 var
   a: Integer;
 begin
-  if (not Assigned(Connection)) or (not Connection.Connected) then exit;
-  if Connection.ConnectorType='mysql' then
-    Properties.Values['ValidateUpdateCount'] := 'False';
+  if (not Assigned(DataBase)) or (not DataBase.Connected) then exit;
+  //if TSQLConnector(DataBase).ConnectorType='mysql' then
+  //  Properties.Values['ValidateUpdateCount'] := 'False';
   {$if FPC_FULLVERSION>30000}
   if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
     TAbstractDBModule(ForigTable.DataModule).LastTime := GetTickCount64;
@@ -736,7 +737,7 @@ begin
     begin
       FIntSQL := TAbstractDBModule(Owner).BuildSQL(Self);
       SQL.Text := FIntSQL;
-      if (FLimit>0) and Assigned(Params.FindParam('Limit')) and ((copy(Connection.ConnectorType,0,8)<>'postgres') or (FLimit>90))  then
+      if (FLimit>0) and Assigned(Params.FindParam('Limit')) and ((copy(TSQLConnector(DataBase).ConnectorType,0,8)<>'postgres') or (FLimit>90))  then
         ParamByName('Limit').AsInteger:=FLimit;
       FFirstOpen:=False;
     end;
@@ -798,7 +799,7 @@ begin
     InternalClose;
     if not Active then
       begin
-        if TAbstractDBModule(Owner).Ping(Connection) then
+        if TAbstractDBModule(Owner).Ping(DataBase) then
           InternalOpen
         else
           begin
@@ -958,7 +959,7 @@ end;
 
 function TSQLDBDataSet.GetLocalSortFields: string;
 begin
-  Result := SortedFields;
+  Result := '';//SortedFields;
 end;
 
 function TSQLDBDataSet.GetBaseSortFields: string;
@@ -967,7 +968,7 @@ begin
 end;
 function TSQLDBDataSet.GetSortLocal: Boolean;
 begin
-  Result := SortType <> stIgnored;
+  Result := False;//SortType <> stIgnored;
 end;
 procedure TSQLDBDataSet.SetFields(const AValue: string);
 begin
@@ -1074,7 +1075,7 @@ end;
 
 procedure TSQLDBDataSet.SetLocalSortFields(const AValue: string);
 begin
-  SortedFields:=AValue;
+  //SortedFields:=AValue;
 end;
 
 procedure TSQLDBDataSet.SetBaseSortFields(const AValue: string);
@@ -1083,6 +1084,7 @@ begin
 end;
 procedure TSQLDBDataSet.SetSortLocal(const AValue: Boolean);
 begin
+  {
   if AValue then
     begin
       if FSortDirection = sdAscending then
@@ -1094,6 +1096,7 @@ begin
     end
   else
     SortType := stIgnored;
+  }
 end;
 function TSQLDBDataSet.GetFilterTables: string;
 begin
@@ -1153,11 +1156,11 @@ begin
 end;
 function TSQLDBDataSet.GetfetchRows: Integer;
 begin
-  result := FetchRow;
+  //result := FetchRow;
 end;
 procedure TSQLDBDataSet.SetfetchRows(AValue: Integer);
 begin
-  FetchRow:=AValue;
+  //FetchRow:=AValue;
 end;
 
 function TSQLDBDataSet.GetParameterValue(const aName: string): Variant;
@@ -1194,7 +1197,7 @@ end;
 
 function TSQLDBDataSet.GetConnection: TComponent;
 begin
-  Result := Connection;
+  Result := DataBase;
 end;
 function TSQLDBDataSet.GetTableCaption: string;
 begin
@@ -1245,7 +1248,7 @@ end;
 
 procedure TSQLDBDataSet.SetConnection(aConn: TComponent);
 begin
-  Connection := TZConnection(aConn);
+  DataBase := TSQLConnector(aConn);
 end;
 
 function TSQLDBDataSet.GetMasterdataSource: TDataSource;
@@ -1336,7 +1339,7 @@ begin
   FSubDataSets := TList.Create;
   FUsePermissions := False;
   FOrigTable := nil;
-  SortType := stIgnored;
+  //SortType := stIgnored;
   FUpStdFields := True;
   FUpChangedBy := True;
   FUseIntegrity:=False;//disable for sync
@@ -1370,7 +1373,6 @@ end;
 initialization
   ConnectionClass:=TSQLConnection;
   QueryClass:=TSQLDBDataSet;
-  Monitor := nil;
 end.
 
 
