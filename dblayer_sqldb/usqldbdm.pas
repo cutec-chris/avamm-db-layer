@@ -1183,11 +1183,14 @@ begin
 end;
 function TSQLDBDataSet.GetfetchRows: Integer;
 begin
-  //result := FetchRow;
+  result := PacketRecords;
 end;
 procedure TSQLDBDataSet.SetfetchRows(AValue: Integer);
 begin
-  //FetchRow:=AValue;
+  if AValue = 0 then
+    PacketRecords:=-1
+  else
+    PacketRecords:=AValue;
 end;
 
 function TSQLDBDataSet.GetParameterValue(const aName: string): Variant;
