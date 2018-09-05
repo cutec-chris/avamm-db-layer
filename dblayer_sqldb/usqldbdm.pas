@@ -29,7 +29,6 @@ type
 
   TSQLConnection = class(TSQLConnector,IBaseDBConnection)
   private
-    FTransaction : TSQLTransaction;
     FProperties: String;
     FEData: Boolean;
     FDatabaseDir: String;
@@ -420,19 +419,19 @@ begin
   else if (copy(ConnectorType,0,5) = 'mssql') then
     TransactIsolationLevel:=tiReadUnCommitted;
   }
-  StartTransaction;
+  Transaction.StartTransaction;
   FInTransaction:=True;
 end;
 function TSQLConnection.DoCommitTransaction: Boolean;
 begin
-  FTransaction.Commit;
+  Transaction.Commit;
   //if TZTransactIsolationLevel(Tag) <> TransactIsolationLevel then
   //  TransactIsolationLevel := TZTransactIsolationLevel(Tag);
   FInTransaction:=False;
 end;
 function TSQLConnection.DoRollbackTransaction: Boolean;
 begin
-  FTransaction.Rollback;
+  Transaction.Rollback;
   //if TZTransactIsolationLevel(Tag) <> TransactIsolationLevel then
   //  TransactIsolationLevel := TZTransactIsolationLevel(Tag);
   FInTransaction:=False;
