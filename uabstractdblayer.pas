@@ -1074,8 +1074,11 @@ end;
 
 function TAbstractDBModule.BlobFieldStream(DataSet: TDataSet; Fieldname: string;
   Tablename: string): TStream;
+var
+  aField: TField;
 begin
-  Result := DataSet.CreateBlobStream(DataSet.FieldByName(Fieldname),bmRead);
+  aField := DataSet.FieldByName(Fieldname);
+  Result := DataSet.CreateBlobStream(aField,bmRead);
 end;
 
 

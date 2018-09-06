@@ -197,6 +197,7 @@ type
     property DefaultTableName : string read FDefaultTableName;
     procedure DoExecSQL;
     function NumRowsAffected: Integer;
+    procedure Post; override;
   end;
 implementation
 uses uEncrypt,mssqlconn, sqlite3conn, pqconnection;
@@ -1418,6 +1419,12 @@ end;
 function TSQLDBDataSet.NumRowsAffected: Integer;
 begin
   Result := RowsAffected;
+end;
+
+procedure TSQLDBDataSet.Post;
+begin
+  inherited Post;
+  ApplyUpdates;
 end;
 
 initialization
