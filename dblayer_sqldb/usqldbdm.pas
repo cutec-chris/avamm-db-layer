@@ -28,6 +28,7 @@ type
   { TSQLConnection }
 
   TSQLConnection = class(TSQLConnector,IBaseDBConnection)
+    procedure SQLConnectionLog(Sender : TSQLConnection; EventType : TDBEventType; Const Msg : String);
   private
     FProperties: String;
     FEData: Boolean;
@@ -404,6 +405,23 @@ begin
 
 end;
 
+procedure TSQLConnection.SQLConnectionLog(Sender: TSQLConnection;
+  EventType: TDBEventType; const Msg: String);
+begin
+  try
+    if pos('--debug-sql',lowercase(cmdline))>0 then
+      if Assigned(Sender.Owner) and Assigned(TAbstractDBModule(Sender.Owner).OnLog) then
+        case EventType of
+        detPrepare:TAbstractDBModule(Sender.Owner).OnLog(Sender.Owner,'Prepare:'+Msg);
+        detExecute:TAbstractDBModule(Sender.Owner).OnLog(Sender.Owner,'Execute:'+Msg);
+        detFetch:TAbstractDBModule(Sender.Owner).OnLog(Sender.Owner,'Fetch:'+Msg);
+        detCommit:TAbstractDBModule(Sender.Owner).OnLog(Sender.Owner,'Commit:'+Msg);
+        detRollBack:TAbstractDBModule(Sender.Owner).OnLog(Sender.Owner,'Rollback:'+Msg);
+        end;
+  except
+  end;
+end;
+
 function TSQLConnection.DoExecuteDirect(aSQL: string): Integer;
 begin
   ExecuteDirect(aSQL);
@@ -617,6 +635,8 @@ constructor TSQLConnection.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   Transaction := TSQLTransaction.Create(Self);
+  OnLog:=TDBLogNotifyEvent(@Self.SQLConnectionLog);
+  LogEvents:=[detExecute];
 end;
 
 destructor TSQLConnection.Destroy;
