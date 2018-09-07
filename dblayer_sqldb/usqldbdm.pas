@@ -200,7 +200,7 @@ type
     procedure Post; override;
   end;
 implementation
-uses uEncrypt,mssqlconn, sqlite3conn, pqconnection;
+uses uEncrypt,mssqlconn, sqlite3conn, sqlite3dyn, pqconnection;
 resourcestring
   strUnknownDbType                = 'Unbekannter Datenbanktyp';
   strDatabaseConnectionLost       = 'Die Datenbankverbindung wurde verloren !';
@@ -275,6 +275,7 @@ begin
 //          if not FileExists(Database) then
 //            raise Exception.Create('Databasefile dosend exists');
         //TransactIsolationLevel:=tiNone;
+        sqlite3_busy_timeout(TSQLite3Connection(Proxy).Handle,10000);
       end;
     if (copy(ConnectorType,0,8) = 'postgres')
     then
