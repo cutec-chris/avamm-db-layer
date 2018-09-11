@@ -225,6 +225,7 @@ begin
     //CleanupSession;
     if Connected then
       Disconnect;
+    AutoEncodeStrings:=false;
     Port:=0;
     Properties.Clear;
     Properties.Add('timeout=3');
@@ -270,6 +271,7 @@ begin
 //        if Connection=MainConnection then //Dont check this on attatched db´s (we want to create them on the fly)
 //          if not FileExists(Database) then
 //            raise Exception.Create('Databasefile dosend exists');
+        Properties.Values['busytimeout'] := '10000';
         TransactIsolationLevel:=tiNone;
       end;
     if (copy(Protocol,0,8) = 'postgres')
@@ -301,6 +303,9 @@ begin
     else if (copy(Protocol,0,5) = 'mssql') then
       begin
         TransactIsolationLevel:=tiReadUncommitted;
+        //ClientCodepage:='UTF-8';
+        ControlsCodePage:=cCP_UTF8;
+        Properties.Add('codepage=latin1');
         AutoEncodeStrings:=true;
       end;
     Properties.Add('Undefined_Varchar_AsString_Length= 255');
