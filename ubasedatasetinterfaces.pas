@@ -836,6 +836,7 @@ begin
 end;
 procedure TAbstractDBDataset.SetFilter(AValue: string);
 begin
+  if GetFilter = AValue then exit;
   with DataSet as IBaseDbFilter do
     Filter := AValue;
 end;

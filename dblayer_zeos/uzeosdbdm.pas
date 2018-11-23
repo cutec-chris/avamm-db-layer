@@ -23,7 +23,7 @@ interface
 uses
   Classes, SysUtils, db, ZConnection, ZSqlMetadata,
   ZAbstractRODataset, ZDataset, ZSequence,ZAbstractConnection,
-  ZSqlMonitor,uBaseDatasetInterfaces,syncobjs,
+  ZSqlMonitor,uBaseDatasetInterfaces,syncobjs,ZAbstractDataset,
   ZCompatibility,dateutils,
   uAbstractDBLayer;
 type
@@ -364,12 +364,14 @@ begin
 end;
 function TZeosConnection.DoInitializeConnection: Boolean;
 begin
+  {
   if not Assigned(Monitor) then
     begin
       Monitor := TZSQLMonitor.Create(Owner);
       Monitor.OnLogTrace:=@MonitorLogTrace;
       Monitor.Active:=True;
     end;
+  }
   Result := True;
   FLimitAfterSelect := False;
   FDBTyp:=Protocol;
@@ -1057,7 +1059,8 @@ begin
         exit;
     end;
   TAbstractDBModule(Owner).DecodeFilter(AValue,FParams,NewSQL);
-  Close;
+  if Active then
+    Close;
   FFilter := AValue;
   if (FIntFilter<>NewSQL) or (SQL.Text='')  then //Params and SQL has changed
     begin
@@ -1410,6 +1413,7 @@ begin
   FUseIntegrity:=False;//disable for sync
   FParams := TStringList.Create;
   FInBeforePost := False;
+  WhereMode:=wmWhereKeyOnly;
 end;
 destructor TZeosDBDataSet.Destroy;
 var
