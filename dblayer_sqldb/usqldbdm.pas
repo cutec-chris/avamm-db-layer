@@ -49,8 +49,8 @@ type
     function DoCommitTransaction: Boolean;
     function DoRollbackTransaction: Boolean;
     function IsTransactionActive: Boolean;
-    procedure DoDisconnect;
-    procedure DoConnect;
+    procedure DoAbstractDisconnect;
+    procedure DoAbstractConnect;
     function GetHandle : Pointer;
     function GetDatabaseName: string;
     function GetUniID(aConnection: TComponent; Generator: string;
@@ -462,18 +462,18 @@ begin
   result := FInTransaction;
 end;
 
-procedure TSQLConnection.DoDisconnect;
+procedure TSQLConnection.DoAbstractDisconnect;
 begin
   try
     Connected := False;
   except
   end;
 end;
-procedure TSQLConnection.DoConnect;
+procedure TSQLConnection.DoAbstractConnect;
 begin
   FInTransaction:=False;
   try
-    Connected := True;
+    DoConnect;
   except on e : Exception do
     begin
 //      if Assigned(BaseApplication) then

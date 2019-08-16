@@ -342,7 +342,7 @@ begin
     begin
       if DoSetProperties(FProperties) and Connected then
         begin
-          (Result as IBaseDBConnection).DoConnect;
+          (Result as IBaseDBConnection).DoAbstractConnect;
           if ((Result as IBaseDBConnection).IsConnected) then
             (Result as IBaseDBConnection).DoInitializeConnection;
         end;
@@ -404,7 +404,7 @@ begin
   FDatabaseDir:=(Connection as IBaseDBConnection).GetDatabaseDir;
   if Result then
     begin
-      (Connection as IBaseDBConnection).DoConnect;
+      (Connection as IBaseDBConnection).DoAbstractConnect;
       Result := Result and ((Connection as IBaseDBConnection).IsConnected) and (Connection as IBaseDBConnection).DoInitializeConnection;
     end;
   Tables.Clear;
@@ -417,7 +417,7 @@ begin
   if Connection=nil then
     Connection := MainConnection;
   Result := (Connection as IBaseDBConnection).DoCreateDBFromProperties(aProp);
-  (Connection as IBaseDBConnection).DoConnect;
+  (Connection as IBaseDBConnection).DoAbstractConnect;
   Result := Result and ((Connection as IBaseDBConnection).IsConnected) and (Connection as IBaseDBConnection).DoInitializeConnection;
   Tables.Clear;
   CheckedTables.Clear;

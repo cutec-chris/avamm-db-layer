@@ -52,8 +52,8 @@ type
     function DoCommitTransaction: Boolean;
     function DoRollbackTransaction: Boolean;
     function IsTransactionActive: Boolean;
-    procedure DoDisconnect;
-    procedure DoConnect;
+    procedure DoAbstractDisconnect;
+    procedure DoAbstractConnect;
     function GetHandle : Pointer;
     function GetDatabaseName: string;
     function GetUniID(aConnection: TComponent; Generator: string;
@@ -277,12 +277,13 @@ begin
     if (copy(Protocol,0,8) = 'postgres')
     then
       begin
+        ControlsCodePage:=cCP_UTF8;
+        Properties.Add('codepage=UTF8');
         Properties.Add('compression=true');
         {$IFDEF CPUARM}
         Properties.Add('sslmode=disable');
         {$ENDIF}
         TransactIsolationLevel:=tiNone;
-        AutoEncodeStrings:=true;
       end
     else if (copy(Protocol,0,8) = 'firebird')
     or (copy(Protocol,0,9) = 'interbase')
@@ -302,11 +303,11 @@ begin
       end
     else if (copy(Protocol,0,5) = 'mssql') then
       begin
+        Properties.Clear;
         TransactIsolationLevel:=tiReadUncommitted;
-        //ClientCodepage:='UTF-8';
-        ControlsCodePage:=cCP_UTF8;
         Properties.Add('codepage=latin1');
-        AutoEncodeStrings:=true;
+        ControlsCodePage:=cCP_UTF8;
+        AutoEncodeStrings:=false;
       end;
     Properties.Add('Undefined_Varchar_AsString_Length= 255');
   finally
@@ -365,6 +366,14 @@ end;
 function TZeosConnection.DoInitializeConnection: Boolean;
 begin
   {
+  sleep(1);
+  if Assigned(Monitor) then
+    begin
+      sleep(1);
+      FreeAndNil(Monitor);
+    end;
+  sleep(1);
+
   if not Assigned(Monitor) then
     begin
       Monitor := TZSQLMonitor.Create(Owner);
@@ -463,7 +472,7 @@ begin
   result := FInTransaction;
 end;
 
-procedure TZeosConnection.DoDisconnect;
+procedure TZeosConnection.DoAbstractDisconnect;
 begin
   try
     Disconnect;
@@ -471,7 +480,7 @@ begin
   end;
   FreeAndNil(Monitor);
 end;
-procedure TZeosConnection.DoConnect;
+procedure TZeosConnection.DoAbstractConnect;
 begin
   FInTransaction:=False;
   try
@@ -802,10 +811,15 @@ begin
   if (not Assigned(Connection)) or (not Connection.Connected) then exit;
   if Connection.Protocol='mysql' then
     Properties.Values['ValidateUpdateCount'] := 'False';
-  {$if FPC_FULLVERSION>30000}
   if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
-    TAbstractDBModule(ForigTable.DataModule).LastTime := GetTickCount64;
-  {$endif}
+    begin
+      {$if FPC_FULLVERSION>30000}
+      TAbstractDBModule(ForigTable.DataModule).LastTime := GetTickCount64;
+      {$else}
+      TAbstractDBModule(ForigTable.DataModule).LastTime := MilliSecondOfTheDay(Now());
+      {$endif}
+      TAbstractDBModule(ForigTable.DataModule).LastStatement := SQL.Text;
+    end;
   if TAbstractDBModule(Owner).IgnoreOpenRequests then exit;
   if FFirstOpen then
     begin
@@ -816,6 +830,15 @@ begin
       FFirstOpen:=False;
     end;
   inherited InternalOpen;
+  {$if FPC_FULLVERSION>30000}
+  if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) and (Assigned(TAbstractDBModule(ForigTable.DataModule).OnLog)) then
+    if GetTickCount64 - TAbstractDBModule(ForigTable.DataModule).LastTime > 100 then
+      TAbstractDBModule(ForigTable.DataModule).OnLog(Self,'Long running Querry '+IntToStr(GetTickCount64 - TAbstractDBModule(ForigTable.DataModule).LastTime)+' ms -> "'+TAbstractDBModule(ForigTable.DataModule).LastStatement+'"');
+  {$else}
+  if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) and (Assigned(TAbstractDBModule(ForigTable.DataModule).OnLog)) then
+    if MilliSecondOfTheDay(Now()) - TAbstractDBModule(ForigTable.DataModule).LastTime > 100 then
+      TAbstractDBModule(ForigTable.DataModule).OnLog(Self,'Long running Querry '+IntToStr(MilliSecondOfTheDay(Now()) - TAbstractDBModule(ForigTable.DataModule).LastTime)+' ms -> "'+TAbstractDBModule(ForigTable.DataModule).LastStatement+'"');
+  {$endif}
   try
   if Assigned(FOrigTable)
   and Assigned(ForigTable.DataModule)
@@ -1437,9 +1460,9 @@ begin
 end;
 
 initialization
+  Monitor := nil;
   ConnectionClass:=TZeosConnection;
   QueryClass:=TZeosDBDataSet;
-  Monitor := nil;
 end.
 
 

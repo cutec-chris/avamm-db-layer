@@ -159,8 +159,8 @@ type
     function DoCommitTransaction: Boolean;
     function DoRollbackTransaction: Boolean;
     function IsTransactionActive: Boolean;
-    procedure DoDisconnect;
-    procedure DoConnect;
+    procedure DoAbstractDisconnect;
+    procedure DoAbstractConnect;
     function DoGetTableNames(aTables : TStrings) : Boolean;
     function DoGetTriggerNames(aTriggers : TStrings) : Boolean;
     function DoGetColumns(aTableName: string): TStrings;
