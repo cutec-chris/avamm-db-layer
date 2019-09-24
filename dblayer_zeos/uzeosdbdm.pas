@@ -271,7 +271,7 @@ begin
 //        if Connection=MainConnection then //Dont check this on attatched db´s (we want to create them on the fly)
 //          if not FileExists(Database) then
 //            raise Exception.Create('Databasefile dosend exists');
-        Properties.Values['busytimeout'] := '10000';
+        Properties.Values['busytimeout'] := '500';
         TransactIsolationLevel:=tiNone;
       end;
     if (copy(Protocol,0,8) = 'postgres')
@@ -832,6 +832,9 @@ begin
         ParamByName('Limit').AsInteger:=FLimit;
       FFirstOpen:=False;
     end;
+  if pos('--debug-sql',lowercase(cmdline))>0 then
+    if Assigned(Owner) and Assigned(TAbstractDBModule(Owner).OnLog) then
+      TAbstractDBModule(Owner).OnLog(Owner,'OpenSQL:'+SQL.Text);
   inherited InternalOpen;
   {$if FPC_FULLVERSION>30000}
   if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) and (Assigned(TAbstractDBModule(ForigTable.DataModule).OnLog)) then

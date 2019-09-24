@@ -649,7 +649,7 @@ begin
         Result += 'FROM '+BuildJoins+' LEFT JOIN '+QuoteField('PERMISSIONS')+' ON ('+QuoteField('PERMISSIONS')+'.'+QuoteField('REF_ID_ID')+'='+QuoteField((DataSet as IBaseManageDB).TableName)+'.'+QuoteField('SQL_ID')+') WHERE ('+aFilter+') AND ('+QuoteField('PERMISSIONS')+'.'+QuoteField('USER')+' is NULL)'
       else
         Result += 'FROM '+BuildJoins+' WHERE ('+aFilter+')';
-      Result := StringReplace(Result,' WHERE () AND ','WHERE ',[]);
+      Result := StringReplace(Result,' WHERE () AND ',' WHERE ',[]);
       Result := StringReplace(Result,' WHERE ()','',[]);
       //if (copy(TZConnection(MainConnection).Protocol,0,5) = 'mssql') and DoQuote then
       //  Result := '('+Result+')';
