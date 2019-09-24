@@ -8,7 +8,7 @@ unit avamm_dblayer_sqldb;
 interface
 
 uses
-  usqldbdm, LazarusPackageIntf;
+  uSQLDBDM, LazarusPackageIntf;
 
 implementation
 

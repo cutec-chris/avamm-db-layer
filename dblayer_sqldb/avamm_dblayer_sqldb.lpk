@@ -3,6 +3,7 @@
   <Package Version="4">
     <Name Value="avamm_dblayer_sqldb"/>
     <Type Value="RunAndDesignTime"/>
+    <AddToProjectUsesSection Value="True"/>
     <CompilerOptions>
       <Version Value="11"/>
       <SearchPaths>

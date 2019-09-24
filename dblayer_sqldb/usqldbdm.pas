@@ -213,6 +213,18 @@ var
   actDir: String;
   actVer: LongInt;
   sl: TStringList;
+  function FixConnector(aC : string) : string;
+  begin
+    case aC of
+    'sqlite-3':Result := 'SQLite3';
+    'mssql':Result := 'MSSQLServer';
+    else
+      Result := aC;
+    end;
+    if copy(ConnectorType,0,8) = 'postgres' then
+      Result := 'PostgreSQL'
+  end;
+
 begin
 //  if Assigned(BaseApplication) then
 //    with BaseApplication as IBaseDBInterface do
@@ -233,18 +245,12 @@ begin
     HostName:='';
     DatabaseName:='';
     if copy(tmp,0,pos(';',tmp)-1) <> 'sqlite-3-edata' then
-      ConnectorType:=copy(tmp,0,pos(';',tmp)-1)
+      ConnectorType:=FixConnector(copy(tmp,0,pos(';',tmp)-1))
     else
       begin
-        ConnectorType:='sqlite-3';
+        ConnectorType:='SQLite3';
         FEData:=True;
       end;
-    if ConnectorType = 'mssql' then
-      ConnectorType := 'MSSQLServer'
-    else if copy(ConnectorType,0,8) = 'postgres' then
-      ConnectorType := 'PostgreSQL'
-    else if (copy(ConnectorType,0,6) = 'sqlite') then
-      ConnectorType := 'SQLite3';
     Assert(ConnectorType<>'',strUnknownDbType);
     tmp := copy(tmp,pos(';',tmp)+1,length(tmp));
     HostName := copy(tmp,0,pos(';',tmp)-1);
@@ -271,6 +277,7 @@ begin
     if (copy(ConnectorType,0,6) = 'sqlite')
     then
       begin
+        Transaction.Commit;
 //        if Connection=MainConnection then //Dont check this on attatched db´s (we want to create them on the fly)
 //          if not FileExists(Database) then
 //            raise Exception.Create('Databasefile dosend exists');
@@ -426,7 +433,9 @@ end;
 
 function TSQLConnection.DoExecuteDirect(aSQL: string): Integer;
 begin
+  Transaction.EndTransaction;
   ExecuteDirect(aSQL);
+  Transaction.StartTransaction;
 end;
 function TSQLConnection.DoStartTransaction(ForceTransaction: Boolean): Boolean;
 begin

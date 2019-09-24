@@ -280,6 +280,7 @@ begin
         ControlsCodePage:=cCP_UTF8;
         Properties.Add('codepage=UTF8');
         Properties.Add('compression=true');
+        Properties.Add('POSTGRES_OPT_RECONNECT=TRUE');
         {$IFDEF CPUARM}
         Properties.Add('sslmode=disable');
         {$ENDIF}
@@ -809,6 +810,8 @@ var
   a: Integer;
 begin
   if (not Assigned(Connection)) or (not Connection.Connected) then exit;
+  if copy(Connection.Protocol,0,8)='postgres' then
+    Connection.PingServer;
   if Connection.Protocol='mysql' then
     Properties.Values['ValidateUpdateCount'] := 'False';
   if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then

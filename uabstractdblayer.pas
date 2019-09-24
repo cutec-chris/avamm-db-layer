@@ -140,10 +140,11 @@ type
   end;
 
 var
-  QueryClass : TDatasetClass;
-  ConnectionClass : TComponentClass;
+  QueryClass : TDatasetClass = nil;
+  ConnectionClass : TComponentClass = nil;
 resourcestring
   strSQLInjection                = 'Versuchte SQL Injection !';
+  strConnectionClassNotAssigned  = 'Verbindungsklasse nicht zugewiesen !';
 implementation
 
 function UniToSys(s : string) : string;
@@ -249,11 +250,13 @@ end;
 
 function TAbstractDBModule.GetDataSetClass: TDatasetClass;
 begin
+  if ConnectionClass = nil then raise Exception.Create(strConnectionClassNotAssigned);
   Result := QueryClass;
 end;
 
 function TAbstractDBModule.GetConnectionClass: TComponentClass;
 begin
+  if ConnectionClass = nil then raise Exception.Create(strConnectionClassNotAssigned);
   Result := ConnectionClass;
 end;
 
