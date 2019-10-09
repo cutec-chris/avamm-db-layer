@@ -37,6 +37,7 @@ type
     FLimitSTMT: String;
     FInTransaction : Boolean;
     FDBTyp: String;
+    FITransaction: TSQLTransaction;
     function DoExecuteDirect(aSQL: string): Integer;
     function DoGetTableNames(aTables: TStrings): Boolean;
     function DoGetTriggerNames(aTriggers: TStrings): Boolean;
@@ -435,7 +436,7 @@ end;
 
 function TSQLConnection.DoExecuteDirect(aSQL: string): Integer;
 begin
-  ExecuteDirect(aSQL,nil);
+  ExecuteDirect(aSQL);
 end;
 function TSQLConnection.DoStartTransaction(ForceTransaction: Boolean): Boolean;
 begin
@@ -655,7 +656,8 @@ end;
 constructor TSQLConnection.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  Transaction := TSQLTransaction.Create(Self);
+  FITransaction := TSQLTransaction.Create(Self);
+  Transaction := FITransaction;
   OnLog:=TDBLogNotifyEvent(@Self.SQLConnectionLog);
   LogEvents:=[detExecute];
 end;

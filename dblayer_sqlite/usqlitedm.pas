@@ -649,6 +649,8 @@ begin
       if FileName='' then FileName:=FConnection.FMaster.FileName;
       FFirstOpen:=False;
     end;
+  if Assigned(TAbstractDBModule(Owner).OnLog) then
+    TAbstractDBModule(Owner).OnLog(Self,SQL);
   inherited InternalOpen;
   try
   if Assigned(FOrigTable)
