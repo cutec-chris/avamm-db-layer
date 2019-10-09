@@ -63,6 +63,8 @@ type
     procedure SetSyncOffset(const AValue: Integer);
     function UseExtData: Boolean;
     function GetDatabaseDir: string;
+    function DoConnect : Boolean;
+    function DoDisconnect : Boolean;
   protected
   public
     constructor Create(AOwner: TComponent); override;
@@ -433,7 +435,7 @@ end;
 
 function TSQLConnection.DoExecuteDirect(aSQL: string): Integer;
 begin
-  ExecuteDirect(aSQL);
+  ExecuteDirect(aSQL,nil);
 end;
 function TSQLConnection.DoStartTransaction(ForceTransaction: Boolean): Boolean;
 begin
@@ -638,6 +640,16 @@ end;
 function TSQLConnection.GetDatabaseDir: string;
 begin
   Result := FDatabaseDir;
+end;
+
+function TSQLConnection.DoConnect: Boolean;
+begin
+  Connected:=True;
+end;
+
+function TSQLConnection.DoDisconnect: Boolean;
+begin
+  Connected:=False;
 end;
 
 constructor TSQLConnection.Create(AOwner: TComponent);
