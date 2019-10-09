@@ -102,7 +102,7 @@ type
     function TableExists(aTableName : string;aConnection : TComponent = nil;AllowLowercase: Boolean = False) : Boolean;virtual;
     function TriggerExists(aTriggerName : string;aConnection : TComponent = nil;AllowLowercase: Boolean = False) : Boolean;virtual;
 
-    function ExecuteDirect(aSQL: string; aConnection: TComponent=nil): Integer;virtual;
+    function ExecuteDirect(aSQL: string; aConnection: TComponent=nil; UseTransaction : Boolean = True): Integer;virtual;
 
     function BuildSQL(DataSet: TDataSet): string;
     function GetUniID(aConnection : TComponent = nil;Generator : string = 'GEN_SQL_ID';Tablename : string = '';AutoInc : Boolean = True) : Variant;virtual;
@@ -492,12 +492,15 @@ begin
   Result := False;
 end;
 
-function TAbstractDBModule.ExecuteDirect(aSQL: string; aConnection: TComponent
-  ): Integer;
+function TAbstractDBModule.ExecuteDirect(aSQL: string; aConnection: TComponent;
+  UseTransaction: Boolean): Integer;
 begin
   if aConnection = nil then
     aConnection := MainConnection;
-  Result := (aConnection as IBaseDBConnection).DoExecuteDirect(aSQL);
+  if UseTransaction then
+    Result := (aConnection as IBaseDBConnection).DoExecuteDirect(aSQL)
+  else
+    Result := (aConnection as IBaseDBConnection).DoExecuteDirectWOTransaction(aSQL);
 end;
 
 function TAbstractDBModule.BuildSQL(DataSet: TDataSet): string;

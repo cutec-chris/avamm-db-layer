@@ -39,6 +39,7 @@ type
     FDBTyp: String;
     FITransaction: TSQLTransaction;
     function DoExecuteDirect(aSQL: string): Integer;
+    function DoExecuteDirectWOTransaction(aSQL: string): Integer;
     function DoGetTableNames(aTables: TStrings): Boolean;
     function DoGetTriggerNames(aTriggers: TStrings): Boolean;
     function DoGetColumns(aTableName: string): TStrings;
@@ -438,6 +439,14 @@ function TSQLConnection.DoExecuteDirect(aSQL: string): Integer;
 begin
   ExecuteDirect(aSQL);
 end;
+
+function TSQLConnection.DoExecuteDirectWOTransaction(aSQL: string): Integer;
+begin
+  ExecuteDirect('rollback');
+  ExecuteDirect(aSQL);
+  ExecuteDirect('begin transaction');
+end;
+
 function TSQLConnection.DoStartTransaction(ForceTransaction: Boolean): Boolean;
 begin
   {

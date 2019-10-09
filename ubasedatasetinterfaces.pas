@@ -155,6 +155,7 @@ type
     function DoGetDBLayerType : string;
     function DoInitializeConnection : Boolean;
     function DoExecuteDirect(aSQL : string) : Integer;
+    function DoExecuteDirectWOTransaction(aSQL : string) : Integer;
     function DoStartTransaction(ForceTransaction : Boolean = False): Boolean;
     function DoCommitTransaction: Boolean;
     function DoRollbackTransaction: Boolean;
