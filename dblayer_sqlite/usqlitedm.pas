@@ -29,6 +29,8 @@ type
 
   TSQLConnection = class(TComponent,IBaseDBConnection)
   private
+    FHandle : Pointer;
+    FDatabasename : string;
     FProperties: String;
     FEData: Boolean;
     FDatabaseDir: String;
@@ -36,6 +38,7 @@ type
     FLimitSTMT: String;
     FInTransaction : Boolean;
     FDBTyp: String;
+    FMaster : TSqlite3Dataset;
     function DoExecuteDirect(aSQL: string): Integer;
     function DoGetTableNames(aTables: TStrings): Boolean;
     function DoGetTriggerNames(aTriggers: TStrings): Boolean;
@@ -64,15 +67,13 @@ type
     function GetDatabaseDir: string;
   protected
   public
-    constructor Create(AOwner: TComponent);
+    constructor Create(AOwner: TComponent);override;
     destructor Destroy; override;
   end;
 
   { TSQLDBDataSet }
 
   TSQLDBDataSet = class(TSqlite3Dataset,IBaseDBFilter,IBaseManageDB,IBaseSubDatasets,IBaseModifiedDS)
-    procedure TDateTimeFieldGetText(Sender: TField; var aText: string;
-      DisplayText: Boolean);
   private
     FFirstOpen : Boolean;
     FSubDataSets : Tlist;
@@ -102,11 +103,13 @@ type
     FParams : TStringList;
     FInBeforePost : Boolean;
     FHasNewID : Boolean;
+    FConnection : TSQLConnection;
     procedure SetNewIDIfNull;
     function IndexExists(aIndexName : string) : Boolean;
     procedure WaitForLostConnection;
     procedure DoUpdateSQL;
   protected
+    function InternalGetHandle: Pointer; override;
     //Internal DataSet Methods that needs to be changed
     procedure InternalOpen; override;
     procedure InternalRefresh; override;
@@ -209,8 +212,8 @@ resourcestring
 function TSQLConnection.DoSetProperties(aProp: string): Boolean;
 var
   tmp: String;
-  actDir: String;
-  actVer: LongInt;
+  actDir, ConnectorType, UserName, Password, HostName, DatabaseName: String;
+  actVer, Port: LongInt;
   sl: TStringList;
   function FixConnector(aC : string) : string;
   begin
@@ -223,19 +226,10 @@ var
   end;
 
 begin
-//  if Assigned(BaseApplication) then
-//    with BaseApplication as IBaseDBInterface do
-//      LastError := '';
   FProperties := aProp;
   Result := True;
   tmp := aProp;
   try
-    //CleanupSession;
-    if Connected then
-      Connected := False;
-    Port:=0;
-    Params.Clear;
-    Params.Add('timeout=3');
     ConnectorType:='';
     UserName:='';
     Password:='';
@@ -271,48 +265,9 @@ begin
       Password := Decrypt(copy(tmp,2,length(tmp)),99998)
     else
       Password := tmp;
-    if (copy(ConnectorType,0,6) = 'sqlite')
-    then
-      begin
-        Transaction.Commit;
-//        if Connection=MainConnection then //Dont check this on attatched db´s (we want to create them on the fly)
-//          if not FileExists(Database) then
-//            raise Exception.Create('Databasefile dosend exists');
-        //TransactIsolationLevel:=tiNone;
-        sqlite3_busy_timeout(TSQLite3Connection(Proxy).Handle,10000);
-      end;
-    if (copy(ConnectorType,0,8) = 'postgres')
-    then
-      begin
-        Params.Add('compression=true');
-        {$IFDEF CPUARM}
-        Properties.Add('sslmode=disable');
-        {$ENDIF}
-        //TransactIsolationLevel:=tiNone;
-        //AutoEncodeStrings:=true;
-      end
-    else if (copy(ConnectorType,0,8) = 'firebird')
-    or (copy(ConnectorType,0,9) = 'interbase')
-    then
-      begin
-        //TransactIsolationLevel:=tiReadCommitted;
-      end
-    else if (copy(ConnectorType,0,5) = 'mysql') then
-      begin
-        //TransactIsolationLevel:=tiReadUncommitted;
-        Params.Clear;
-        Params.Add('compression=true');
-        //Properties.Add('codepage=UTF8');
-        //Properties.Add('timeout=0');
-        Params.Add('ValidateUpdateCount=-1');
-        Params.Add('MYSQL_OPT_RECONNECT=TRUE');
-      end
-    else if (copy(ConnectorType,0,5) = 'mssql') then
-      begin
-        //TransactIsolationLevel:=tiReadUncommitted;
-        //AutoEncodeStrings:=true;
-      end;
-    Params.Add('Undefined_Varchar_AsString_Length= 255');
+    FMaster.FileName:=':memory:';
+    FMaster.TableName:='sqlite_master';
+    FMaster.Open;
   finally
   end;
 end;
@@ -323,6 +278,7 @@ var
   aPassword: String;
 begin
   DoSetProperties(aProp);
+  {
   aDatabase := DatabaseName;
   aUser := UserName;
   aPassword := Password;
@@ -366,11 +322,13 @@ begin
     Connected:=True;
     Result := Connected;
     Connected:=False;
+  }
 end;
 function TSQLConnection.DoInitializeConnection: Boolean;
 begin
   Result := True;
   FLimitAfterSelect := False;
+  {
   FDBTyp:=ConnectorType;
   FLimitSTMT := 'LIMIT %s';
   if copy(ConnectorType,0,6) = 'sqlite' then
@@ -408,29 +366,15 @@ begin
       FDBTyp := 'postgres';
 
     end;
-
-end;
-
-procedure TSQLConnection.SQLConnectionLog(Sender: TSQLConnection;
-  EventType: TDBEventType; const Msg: String);
-begin
-  try
-    if pos('--debug-sql',lowercase(cmdline))>0 then
-      if Assigned(Sender.Owner) and Assigned(TAbstractDBModule(Sender.Owner).OnLog) then
-        case EventType of
-        detPrepare:TAbstractDBModule(Sender.Owner).OnLog(Sender.Owner,'Prepare:'+Msg);
-        detExecute:TAbstractDBModule(Sender.Owner).OnLog(Sender.Owner,'Execute:'+Msg);
-        detFetch:TAbstractDBModule(Sender.Owner).OnLog(Sender.Owner,'Fetch:'+Msg);
-        detCommit:TAbstractDBModule(Sender.Owner).OnLog(Sender.Owner,'Commit:'+Msg);
-        detRollBack:TAbstractDBModule(Sender.Owner).OnLog(Sender.Owner,'Rollback:'+Msg);
-        end;
-  except
-  end;
+  }
 end;
 
 function TSQLConnection.DoExecuteDirect(aSQL: string): Integer;
 begin
-  ExecuteDirect(aSQL);
+  if FHandle = nil then
+    FHandle:=FMaster.SqliteHandle;
+  if FMaster.Active then FMaster.Close;
+  FMaster.ExecSQL(aSQL);
 end;
 function TSQLConnection.DoStartTransaction(ForceTransaction: Boolean): Boolean;
 begin
@@ -443,19 +387,19 @@ begin
   else if (copy(ConnectorType,0,5) = 'mssql') then
     TransactIsolationLevel:=tiReadUnCommitted;
   }
-  Transaction.StartTransaction;
+  //Transaction.StartTransaction;
   FInTransaction:=True;
 end;
 function TSQLConnection.DoCommitTransaction: Boolean;
 begin
-  Transaction.Commit;
+  //Transaction.Commit;
   //if TZTransactIsolationLevel(Tag) <> TransactIsolationLevel then
   //  TransactIsolationLevel := TZTransactIsolationLevel(Tag);
   FInTransaction:=False;
 end;
 function TSQLConnection.DoRollbackTransaction: Boolean;
 begin
-  Transaction.Rollback;
+  //Transaction.Rollback;
   //if TZTransactIsolationLevel(Tag) <> TransactIsolationLevel then
   //  TransactIsolationLevel := TZTransactIsolationLevel(Tag);
   FInTransaction:=False;
@@ -469,7 +413,7 @@ end;
 procedure TSQLConnection.DoAbstractDisconnect;
 begin
   try
-    Connected := False;
+    //Connected := False;
   except
   end;
 end;
@@ -477,30 +421,27 @@ procedure TSQLConnection.DoAbstractConnect;
 begin
   FInTransaction:=False;
   try
-    DoConnect;
+    FMaster.Open;
   except on e : Exception do
     begin
-//      if Assigned(BaseApplication) then
-//        with BaseApplication as IBaseDBInterface do
-//          LastError := e.Message;
     end;
   end;
 end;
 
 function TSQLConnection.GetHandle: Pointer;
 begin
-  Result := Handle;
+  Result := FHandle;
 end;
 
 function TSQLConnection.GetDatabaseName: string;
 begin
-  Result := DatabaseName;
+  Result := FDatabaseName;
 end;
 
 function TSQLConnection.GetUniID(aConnection: TComponent; Generator: string;
   Tablename: string; AutoInc: Boolean): Variant;
 var
-  Resultset: TSQLQuery;
+  Resultset: TSqlite3Dataset;
   bConnection: TComponent;
   aId: Int64 = 0;
 begin
@@ -512,23 +453,11 @@ begin
           begin
             if AutoInc then
               begin
-                if (copy(ConnectorType,0,5) = 'mysql') then
-                  begin
-                    ExecuteDirect('update '+QuoteField(Generator)+' set '+QuoteField('ID')+'='+QuoteField('ID')+'+1;')
-                  end
-                else
-                  begin
-                    if LimitAfterSelect then
-                      ExecuteDirect('update '+QuoteField(Generator)+' set '+QuoteField('ID')+'=(select '+Format(LimitSTMT,['1'])+' '+QuoteField('ID')+' from '+QuoteField(Generator)+')+1;')
-                    else
-                      ExecuteDirect('update '+QuoteField(Generator)+' set '+QuoteField('ID')+'=(select '+QuoteField('ID')+' from '+QuoteField(Generator)+' '+Format(LimitSTMT,['1'])+')+1;');
-                  end;
+                ExecuteDirect('update '+QuoteField(Generator)+' set '+QuoteField('ID')+'=(select '+Format(LimitSTMT,['1'])+' '+QuoteField('ID')+' from '+QuoteField(Generator)+')+1;')
               end;
             try
-              ResultSet := TSQLQuery.Create(Self);
-              ResultSet.DataBase := Self;
-              ResultSet.ReadOnly:=True;
-              ResultSet.SQL.Text := 'SELECT '+QuoteField('ID')+' FROM '+QuoteField(Generator);
+              ResultSet := TSqlite3Dataset.Create(Self);
+              ResultSet.SQL := 'SELECT '+QuoteField('ID')+' FROM '+QuoteField(Generator);
               Resultset.Open;
               if ResultSet.RecordCount>0 then
                 Result := ResultSet.FieldByName('ID').AsLargeInt
@@ -542,7 +471,7 @@ begin
                 if Tablename<>'' then
                   begin
                     ResultSet.Close;
-                    ResultSet.SQL.Text := 'SELECT '+QuoteField('SQL_ID')+' FROM '+QuoteField(Tablename)+' WHERE '+QuoteField('SQL_ID')+'='+QuoteValue(Format('%d',[Int64(Result)]));
+                    ResultSet.SQL := 'SELECT '+QuoteField('SQL_ID')+' FROM '+QuoteField(Tablename)+' WHERE '+QuoteField('SQL_ID')+'='+QuoteValue(Format('%d',[Int64(Result)]));
                     Resultset.Open;
                     if ResultSet.RecordCount>0 then
                       aId := ResultSet.FieldByName('ID').AsLargeInt;
@@ -561,7 +490,16 @@ end;
 function TSQLConnection.DoGetTableNames(aTables: TStrings): Boolean;
 begin
   Result := True;
-  GetTableNames(aTables,False);
+  FMaster.Filter:='type=table';
+  FMaster.Open;
+  FMaster.First;
+  while not FMaster.EOF do
+    begin
+      if aTables.IndexOf(FMaster.FieldByName('name').AsString)=-1 then
+        aTables.Add(FMaster.FieldByName('name').AsString);
+      FMaster.Next;
+    end;
+  //GetTableNames(aTables,False);
 end;
 function TSQLConnection.DoGetTriggerNames(aTriggers: TStrings): Boolean;
 begin
@@ -571,7 +509,7 @@ end;
 function TSQLConnection.DoGetColumns(aTableName: string): TStrings;
 begin
   Result := TStringList.Create;
-  GetFieldNames(aTableName,Result);
+  //GetFieldNames(aTableName,Result);
 end;
 
 function TSQLConnection.DoGetIndexes(aTableName: string): TStrings;
@@ -581,7 +519,7 @@ end;
 
 function TSQLConnection.IsConnected: Boolean;
 begin
-  Result := Connected;
+  Result := FMaster.Active;
 end;
 function TSQLConnection.GetLimitAfterSelect: Boolean;
 begin
@@ -594,23 +532,16 @@ end;
 
 function TSQLConnection.DoGetDBLayerType: string;
 begin
-  if FDBTyp = '' then
-    Result := ConnectorType
-  else Result := FDBTyp;
-  case ConnectorType of
-  'SQLite3':Result := 'sqlite';
-  'MSSQLServer':Result := 'mssql';
-  'PostgreSQL':Result := 'postgres';
-  end;
+  Result := FDBTyp;
 end;
 
 function TSQLConnection.GetSyncOffset: Integer;
 var
-  ResultSet: TSQLQuery;
+  ResultSet: TSqlite3Dataset;
   bConnection: TComponent;
 begin
-  ResultSet := TSQLQuery.Create(Self);
-  ResultSet.SQL.Text := 'SELECT '+TAbstractDBModule(Owner).QuoteField('ID')+' FROM '+TAbstractDBModule(Owner).QuoteField('GEN_SQL_ID');
+  ResultSet := TSqlite3Dataset.Create(Self);
+  ResultSet.SQL := 'SELECT '+TAbstractDBModule(Owner).QuoteField('ID')+' FROM '+TAbstractDBModule(Owner).QuoteField('GEN_SQL_ID');
   ResultSet.Open;
   if ResultSet.RecordCount>0 then
     Result := ResultSet.FieldByName('ID').AsLargeInt shr 56
@@ -624,7 +555,7 @@ var
 begin
   aVal := AValue;
   aVal := aVal shl 56;
-  ExecuteDirect('update '+TAbstractDBModule(Owner).QuoteField('GEN_SQL_ID')+' set '+TAbstractDBModule(Owner).QuoteField('ID')+'='+IntToStr(aVal));
+  //ExecuteDirect('update '+TAbstractDBModule(Owner).QuoteField('GEN_SQL_ID')+' set '+TAbstractDBModule(Owner).QuoteField('ID')+'='+IntToStr(aVal));
 end;
 
 function TSQLConnection.UseExtData: Boolean;
@@ -639,6 +570,7 @@ end;
 
 constructor TSQLConnection.Create(AOwner: TComponent);
 begin
+  FMaster := TSqlite3Dataset.Create(Self);
 end;
 
 destructor TSQLConnection.Destroy;
@@ -646,112 +578,35 @@ begin
   inherited Destroy;
 end;
 
-procedure TSQLDBDataSet.TDateTimeFieldGetText(Sender: TField;
-  var aText: string; DisplayText: Boolean);
-begin
-  if not Sender.IsNull then
-    begin
-      if trunc(Sender.AsDateTime)=Sender.AsDateTime then
-        aText := FormatDateTime(ShortDateFormat,Sender.AsDateTime)
-      else
-        aText := FormatDateTime(ShortDateFormat+' '+ShortTimeFormat,Sender.AsDateTime);
-    end;
-end;
 procedure TSQLDBDataSet.SetNewIDIfNull;
 begin
   if (FieldDefs.IndexOf('AUTO_ID') = -1) and (FieldDefs.IndexOf('SQL_ID') > -1) and  FieldByName('SQL_ID').IsNull then
     begin
-      FieldByName('SQL_ID').AsVariant:=TAbstractDBModule(Self.Owner).GetUniID(Self.DataBase,'GEN_SQL_ID',(Self as IBaseManageDB).TableName);
+      FieldByName('SQL_ID').AsVariant:=TAbstractDBModule(Self.Owner).GetUniID(Self,'GEN_SQL_ID',(Self as IBaseManageDB).TableName);
       FHasNewID:=True;
     end
   else if (FieldDefs.IndexOf('SQL_ID') = -1) and (FieldDefs.IndexOf('AUTO_ID') > -1) and FieldByName('AUTO_ID').IsNull then
     begin
       with Self as IBaseManageDB do
-        FieldByName('AUTO_ID').AsVariant:=TAbstractDBModule(Self.Owner).GetUniID(Self.DataBase,'GEN_AUTO_ID',TableName);
+        FieldByName('AUTO_ID').AsVariant:=TAbstractDBModule(Self.Owner).GetUniID(Self,'GEN_AUTO_ID',TableName);
       FHasNewID:=True;
     end;
 end;
 
 function TSQLDBDataSet.IndexExists(aIndexName: string): Boolean;
 var
-  CustomQuery: TSQLQuery;
+  CustomQuery: TSqlite3Dataset;
 begin
-  CustomQuery := TSQLQuery.Create(Self);
-  CustomQuery.DataBase := DataBase;
-  if (copy(TSQLConnector(TAbstractDBModule(Owner).MainConnection).ConnectorType,0,8) = 'firebird')
-  or (copy(TSQLConnector(TAbstractDBModule(Owner).MainConnection).ConnectorType,0,9) = 'interbase') then
-    begin
-      CustomQuery.SQL.Text := 'select rdb$index_name from rdb$indices where rdb$index_name='+TAbstractDBModule(Owner).QuoteValue(indexname);
-      CustomQuery.Open;
-      Result := CustomQuery.RecordCount > 0;
-      CustomQuery.Close;
-    end
-  else if (copy(TSQLConnector(TAbstractDBModule(Owner).MainConnection).ConnectorType,0,6) = 'sqlite') then
-    begin
-      CustomQuery.SQL.Text := 'select name from SQLITE_MASTER where "TYPE"=''index'' and NAME='+TAbstractDBModule(Owner).QuoteValue(indexname);
-      CustomQuery.Open;
-      Result := CustomQuery.RecordCount > 0;
-      CustomQuery.Close;
-    end
-  else if (copy(TSQLConnector(TAbstractDBModule(Owner).MainConnection).ConnectorType,0,5) = 'mssql') then
-    begin
-      CustomQuery.SQL.Text := 'select name from dbo.sysindexes where NAME='+TAbstractDBModule(Owner).QuoteValue(indexname);
-      CustomQuery.Open;
-      Result := CustomQuery.RecordCount > 0;
-      CustomQuery.Close;
-    end
-  else if (copy(TSQLConnector(TAbstractDBModule(Owner).MainConnection).ConnectorType,0,8) = 'postgres') then
-    begin
-      CustomQuery.SQL.Text := 'select * from pg_class where relname='+TAbstractDBModule(Owner).QuoteValue(indexname);
-      CustomQuery.Open;
-      Result := CustomQuery.RecordCount > 0;
-      CustomQuery.Close;
-    end
-  else
-    begin
-      {
-      Metadata := TZSQLMetaData.Create(TZConnection(TAbstractDBModule(Owner).MainConnection));
-      MetaData.Connection := Connection;
-      MetaData.MetadataType:=mdIndexInfo;
-      Metadata.Catalog:=TZConnection(TAbstractDBModule(Owner).MainConnection).Catalog;
-      Metadata.TableName:=copy(indexname,0,pos('_',indexname)-1);
-      MetaData.Filter:='INDEX_NAME='+TAbstractDBModule(Owner).QuoteValue(indexname);
-      MetaData.Filtered:=True;
-      MetaData.Active:=True;
-      Result := MetaData.RecordCount > 0;
-      MetaData.Free;
-      }
-    end;
+  CustomQuery := TSqlite3Dataset.Create(Self);
+  CustomQuery.SQL := 'select name from SQLITE_MASTER where "TYPE"=''index'' and NAME='+TAbstractDBModule(Owner).QuoteValue(aindexname);
+  CustomQuery.Open;
+  Result := CustomQuery.RecordCount > 0;
+  CustomQuery.Close;
   CustomQuery.Free;
 end;
 
 procedure TSQLDBDataSet.WaitForLostConnection;
-var
-  aConnThere: Boolean;
 begin
-  if not TAbstractDBModule(Owner).Ping(DataBase) then
-    begin
-      if Assigned(TAbstractDBModule(Owner).OnConnectionLost) then
-        TAbstractDBModule(Owner).OnConnectionLost(TAbstractDBModule(Owner));
-      aConnThere := False;
-      while not aConnThere do
-        begin
-          if GetCurrentThreadID=MainThreadID then
-            begin
-              if Assigned(TAbstractDBModule(Owner).OnDisconnectKeepAlive) then
-                TAbstractDBModule(Owner).OnDisconnectKeepAlive(TAbstractDBModule(Owner));
-            end;
-          try
-            if TAbstractDBModule(Owner).Ping(DataBase) then
-              aConnThere := True;
-            sleep(2000);
-          except
-            sleep(200);
-          end;
-        end;
-      if Assigned(TAbstractDBModule(Owner).OnConnect) then
-        TAbstractDBModule(Owner).OnConnect(TAbstractDBModule(Owner));
-    end;
 end;
 
 procedure TSQLDBDataSet.DoUpdateSQL;
@@ -761,17 +616,25 @@ begin
     SetSQL(FSQL)
   else
     begin
-      SQL.Text:='';
+      SQL:='';
       FIntSQL := '';
       SetFilter(FFilter);
     end;
+end;
+
+function TSQLDBDataSet.InternalGetHandle: Pointer;
+begin
+  if FConnection.GetHandle=nil then
+    begin
+      FConnection.FHandle := inherited;
+    end;
+  Result:=FConnection.GetHandle;
 end;
 
 procedure TSQLDBDataSet.InternalOpen;
 var
   a: Integer;
 begin
-  if (not Assigned(DataBase)) or (not DataBase.Connected) then exit;
   //if TSQLConnector(DataBase).ConnectorType='mysql' then
   //  Properties.Values['ValidateUpdateCount'] := 'False';
   {$if FPC_FULLVERSION>30000}
@@ -782,9 +645,8 @@ begin
   if FFirstOpen then
     begin
       FIntSQL := TAbstractDBModule(Owner).BuildSQL(Self);
-      SQL.Text := FIntSQL;
-      if (FLimit>0) and Assigned(Params.FindParam('Limit')) and ((copy(TSQLConnector(DataBase).ConnectorType,0,8)<>'postgres') or (FLimit>90))  then
-        ParamByName('Limit').AsInteger:=FLimit;
+      SQL := FIntSQL;
+      if FileName='' then FileName:=FConnection.FMaster.FileName;
       FFirstOpen:=False;
     end;
   inherited InternalOpen;
@@ -819,7 +681,6 @@ begin
               then
                 begin
                   TDateTimeField(Fields[a]).DisplayFormat := ShortDateFormat+' '+ShortTimeFormat;
-                  TDateTimeField(Fields[a]).OnGetText:=@TDateTimeFieldGetText;
                 end;
             end;
           EnableControls;
@@ -844,15 +705,7 @@ begin
   except
     InternalClose;
     if not Active then
-      begin
-        if TAbstractDBModule(Owner).Ping(DataBase) then
-          InternalOpen
-        else
-          begin
-            WaitForLostConnection;
-            InternalOpen;
-          end;
-      end;
+      InternalOpen
   end;
   finally
 //    if Assigned(FOrigTable) and Assigned(ForigTable.DataModule) then
@@ -1030,37 +883,24 @@ var
   i: Integer;
   aPar: TParam;
 begin
-  if (FFilter=AValue) and (SQL.text<>'')  then
+  if (FFilter=AValue) and (SQL<>'')  then
     begin
-      if (AValue<>'') or (pos('where',lowercase(SQL.Text))=0) then
+      if (AValue<>'') or (pos('where',lowercase(SQL))=0) then
         exit;
     end;
   TAbstractDBModule(Owner).ParameteriseSQL:=False;
   TAbstractDBModule(Owner).DecodeFilter(AValue,FParams,NewSQL);
   Close;
   FFilter := AValue;
-  if (FIntFilter<>NewSQL) or (SQL.Text='')  then //Params and SQL has changed
+  if (FIntFilter<>NewSQL) or (SQL='')  then //Params and SQL has changed
     begin
       FSQL := '';
       if TAbstractDBModule(Owner).CheckForInjection(AValue) then exit;
       FIntFilter:=NewSQL;
       FIntSQL := '';
       FIntSQL := TAbstractDBModule(Owner).BuildSQL(Self);
-      Params.Clear;
-      SQL.text := FIntSQL;
+      SQL := FIntSQL;
     end;
-  for i := 0 to FParams.Count-1 do
-    begin
-      if Assigned(Params.FindParam(FParams.Names[i])) then
-        begin
-          aPar := ParamByName(FParams.Names[i]);
-          aPar.AsString:=FParams.ValueFromIndex[i];
-        end;
-    end;
-  {
-  if (FLimit>0) and Assigned(Params.FindParam('Limit')) then
-    ParamByName('Limit').AsInteger:=FLimit;
-  }
 end;
 procedure TSQLDBDataSet.SetBaseFilter(const AValue: string);
 begin
@@ -1079,28 +919,12 @@ var
 begin
   if AValue=FSQL then exit;
   Close;
-  Params.Clear;
   FParams.Clear;
   FSQL := AValue;
   FIntSQL := TAbstractDBModule(Owner).BuildSQL(Self);
   FFilter := '';
   FIntFilter:='';
-  SQL.Text := FIntSQL;
-  {
-  TAbstractDBModule(Owner).DecodeFilter(AValue,FParams,NewSQL);
-  Params.Clear;
-  FSQL := NewSQL;
-  FIntSQL := BuildSQL;
-  FFilter := '';
-  SQL.Text := FIntSQL;
-  for i := 0 to FParams.Count-1 do
-    begin
-      aPar := ParamByName(FParams.Names[i]);
-      aPar.AsString:=FParams.ValueFromIndex[i];
-    end;
-  }
-  if (FLimit>0) and Assigned(Params.FindParam('Limit')) then
-    ParamByName('Limit').AsInteger:=FLimit;
+  SQL := FIntSQL;
 end;
 procedure TSQLDBDataSet.Setlimit(const AValue: Integer);
 begin
@@ -1205,24 +1029,19 @@ begin
 end;
 function TSQLDBDataSet.GetfetchRows: Integer;
 begin
-  result := PacketRecords;
+  result := 0;
 end;
 procedure TSQLDBDataSet.SetfetchRows(AValue: Integer);
 begin
-  if AValue = 0 then
-    PacketRecords:=-1
-  else
-    PacketRecords:=AValue;
 end;
 
 function TSQLDBDataSet.GetParameterValue(const aName: string): Variant;
 begin
-  Result := ParamByName(aName).Value;
+  Result := Null;
 end;
 
 procedure TSQLDBDataSet.SetParameterValue(const aName: string; AValue: Variant);
 begin
-  ParamByName(aName).Value := AValue;
 end;
 
 function TSQLDBDataSet.GetManagedFieldDefs: TFieldDefs;
@@ -1249,7 +1068,7 @@ end;
 
 function TSQLDBDataSet.GetConnection: TComponent;
 begin
-  Result := DataBase;
+  Result := FConnection;
 end;
 function TSQLDBDataSet.GetTableCaption: string;
 begin
@@ -1290,17 +1109,17 @@ end;
 
 function TSQLDBDataSet.GetAsReadonly: Boolean;
 begin
-  result := Self.ReadOnly;
 end;
 
 procedure TSQLDBDataSet.SetAsReadonly(AValue: Boolean);
 begin
-  Self.ReadOnly:=AValue;
 end;
 
 procedure TSQLDBDataSet.SetConnection(aConn: TComponent);
 begin
-  DataBase := TSQLConnector(aConn);
+  FConnection := TSQLConnection(aConn);
+  //SqliteHandle := FConnection.GetHandle;
+  FileName:=FConnection.FDatabasename;
 end;
 
 function TSQLDBDataSet.GetMasterdataSource: TDataSource;
@@ -1330,7 +1149,6 @@ end;
 
 procedure TSQLDBDataSet.SetDataSource(AValue: TDataSource);
 begin
-  DataSource := AValue;
 end;
 
 procedure TSQLDBDataSet.SetFieldData(Field: TField; Buffer: Pointer);

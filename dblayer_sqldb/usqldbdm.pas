@@ -433,9 +433,7 @@ end;
 
 function TSQLConnection.DoExecuteDirect(aSQL: string): Integer;
 begin
-  Transaction.EndTransaction;
   ExecuteDirect(aSQL);
-  Transaction.StartTransaction;
 end;
 function TSQLConnection.DoStartTransaction(ForceTransaction: Boolean): Boolean;
 begin
